@@ -1,32 +1,28 @@
-import fitz
+import fitz  # PyMuPDF
 import tiktoken
 import re
 
 def sieve_text(text: str) -> str:
-    # Basic cleanup: Remove excessive whitespace
+    """Core cleaning logic."""
     text = re.sub(r'\s+', ' ', text)
     return text.strip()
 
-def process_pdf(file_path: str):
-    # 1. Parse
+def get_token_count(text: str, model: str = "gpt-4o") -> int:
+    """Helper for audit metrics."""
+    encoder = tiktoken.encoding_for_model(model)
+    return len(encoder.encode(text))
+
+def process_document(file_path: str):
+    """Orchestrates parsing and auditing."""
     doc = fitz.open(file_path)
     raw_text = "\n".join([page.get_text() for page in doc])
     
-    # 2. Sieve
-    optimized_text = sieve_text(raw_text)
+    optimized = sieve_text(raw_text)
     
-    # 3. Audit
-    enc = tiktoken.encoding_for_model("gpt-4o")
-    orig_tokens = len(enc.encode(raw_text))
-    opt_tokens = len(enc.encode(optimized_text))
+    print(f"Original tokens: {get_token_count(raw_text)}")
+    print(f"Optimized tokens: {get_token_count(optimized)}")
     
-    print(f"Original: {orig_tokens} tokens")
-    print(f"Optimized: {opt_tokens} tokens")
-    print(f"Saved: {orig_tokens - opt_tokens} tokens")
-    
-    return optimized_text
+    return optimized
 
 if __name__ == "__main__":
-    # Replace 'sample.pdf' with a real file path
-    # output = process_pdf("sample.pdf")
-    print("Quantagen Engine Initialized.")
+    print("Quantagen Engine v0.1.0 Ready.")
