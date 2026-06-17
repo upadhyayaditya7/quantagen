@@ -1,3 +1,4 @@
+import os
 import fitz
 import tiktoken
 import re
@@ -28,22 +29,23 @@ def get_token_count(text: str, model: str = "gpt-4o") -> int:
     return len(encoder.encode(text))
 
 def process_document(file_path: str):
+    # Ensure output directory exists
+    if not os.path.exists("outputs"):
+        os.makedirs("outputs")
+        
     doc = fitz.open(file_path)
     raw_text = "\n".join([page.get_text() for page in doc])
     
-    # Track stages
     step1 = filter_noise(raw_text)
-    step2 = sieve_text(step1) # whitespace cleanup
+    step2 = sieve_text(step1)
     
-    orig_tokens = get_token_count(raw_text)
-    final_tokens = get_token_count(step2)
+    # Save the output
+    output_filename = f"outputs/cleaned_{os.path.basename(file_path).replace('.pdf', '.txt')}"
+    with open(output_filename, "w", encoding="utf-8") as f:
+        f.write(step2)
     
-    # Audit summary
-    print(f"--- Quantagen Audit Report ---")
-    print(f"Initial: {orig_tokens} tokens")
-    print(f"Final:   {final_tokens} tokens")
-    print(f"Overall Efficiency Gain: {((orig_tokens - final_tokens) / orig_tokens) * 100:.2f}%")
-    
+    # ... (rest of your audit report printing logic)
+    print(f"Cleaned file saved to: {output_filename}")
     return step2
 
 if __name__ == "__main__":
