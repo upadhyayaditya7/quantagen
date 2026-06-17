@@ -62,6 +62,17 @@ def process_document(file_name: str):
     except Exception as e:
         print(f"Failed to process {file_name}: {e}")
         return None
+    
+    
+def extract_text_from_stream(file_stream):
+    doc = fitz.open(stream=file_stream.read(), filetype="pdf")
+    return "\n".join([page.get_text() for page in doc])
+
+def calc_efficiency(raw_text, clean_text):
+    raw = get_token_count(raw_text)
+    clean = get_token_count(clean_text)
+    saved = raw - clean
+    return (saved / raw * 100) if raw > 0 else 0
 
 if __name__ == "__main__":
     input_folder = "inputs"
