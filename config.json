@@ -1,8 +1,15 @@
 {
   "noise_patterns": [
-    "International Journal of.*",
-    "Published By:.*",
-    "Retrieval Number:.*",
-    "DOI : .*"
+    "International Journal on Recent and Innovation Trends in Computing and Communication.*",
+    "ISSN: \\d{4}-\\d{4}",
+    "Volume: \\d+ Issue: \\d+",
+    "________________.*",
+    "IJRITCC \\| January 2014, Available @.*"
+  ],
+  "stop_markers": [
+    "REFERENCES",
+    "BIBLIOGRAPHY",
+    "LITERATURE CITED",
+    "WORKS CITED"
   ]
 }

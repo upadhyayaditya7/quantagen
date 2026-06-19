@@ -2,8 +2,7 @@ import os
 import fitz
 import tiktoken
 import re
-from rules.parser import strip_recurring_noise, truncate_references
-# Defined at the top so it is available to the entire script
+from rules.parser import strip_recurring_noise, truncate_at_stop_markers
 def get_token_count(text: str, model: str = "gpt-4o") -> int:
     encoder = tiktoken.encoding_for_model(model)
     return len(encoder.encode(text))
@@ -15,10 +14,10 @@ def filter_noise(text: str) -> str:
     text = re.sub(r'\.{3,}', '', text)
     return text.strip()
 
-def sieve_text(text: str) -> str:
-    text = filter_noise(text)
-    text = re.sub(r'\s+', ' ', text)
-    return text.strip()
+def sieve_text(raw_text):
+    clean_text = truncate_at_stop_markers(raw_text)
+    clean_text = strip_recurring_noise(clean_text)
+    return clean_text
 
 def process_document(file_name: str):
     input_folder = "inputs"
