@@ -2,7 +2,7 @@ import os
 import fitz
 import tiktoken
 import re
-
+from rules.parser import strip_recurring_noise, truncate_references
 # Defined at the top so it is available to the entire script
 def get_token_count(text: str, model: str = "gpt-4o") -> int:
     encoder = tiktoken.encoding_for_model(model)

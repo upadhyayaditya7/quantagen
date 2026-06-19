@@ -1,0 +1,8 @@
+{
+  "noise_patterns": [
+    "International Journal of.*",
+    "Published By:.*",
+    "Retrieval Number:.*",
+    "DOI : .*"
+  ]
+}
