@@ -2,7 +2,8 @@ import os
 import fitz
 import tiktoken
 import re
-from rules.parser import strip_recurring_noise, truncate_at_stop_markers
+from rules.parser import strip_recurring_noise, truncate_at_stop_markers, extract_sections 
+
 def get_token_count(text: str, model: str = "gpt-4o") -> int:
     encoder = tiktoken.encoding_for_model(model)
     return len(encoder.encode(text))
@@ -34,33 +35,42 @@ def process_document(file_name: str):
         raw_text = "\n".join([page.get_text() for page in doc])
         raw_token_count = get_token_count(raw_text)
         
-        # 2. Process
+        # 2. Process (Filtering & Sieve)
         step1 = filter_noise(raw_text)
         step2 = sieve_text(step1)
+        
+        # 3. Extract Metadata
+        # We perform this on the cleaned text to avoid headers/footers in the summary
+        sections = extract_sections(step2)
+        
         clean_token_count = get_token_count(step2)
         
-        # 3. Analyze impact
+        # 4. Analyze impact
         saved_tokens = raw_token_count - clean_token_count
         reduction_pct = (saved_tokens / raw_token_count * 100) if raw_token_count > 0 else 0
         
-        # 4. Save
+        # 5. Save
         clean_name = os.path.basename(file_name).replace('.pdf', '.txt')
         output_filename = os.path.join(output_folder, f"cleaned_{clean_name}")
         
         with open(output_filename, "w", encoding="utf-8") as f:
             f.write(step2)
         
-        # 5. Output Audit Report
+        # 6. Output Audit Report
         print(f"\n--- Audit Report: {file_name} ---")
         print(f"Raw Tokens:     {raw_token_count}")
         print(f"Cleaned Tokens: {clean_token_count}")
         print(f"Noise Removed:  {saved_tokens} tokens ({reduction_pct:.2f}% efficiency)")
+        if 'abstract' in sections: print(f"  [+] Extracted Abstract")
+        if 'conclusion' in sections: print(f"  [+] Extracted Conclusion")
         print(f"Saved to:       {output_filename}")
         
-        return step2
+        # Returning both text and metadata dictionary for potential UI usage
+        return step2, sections
+        
     except Exception as e:
         print(f"Failed to process {file_name}: {e}")
-        return None
+        return None, None
     
     
 def extract_text_from_stream(file_stream):
@@ -86,5 +96,5 @@ if __name__ == "__main__":
         else:
             print(f"Quantagen Engine v0.1.0: Found {len(files)} files. Starting batch processing...")
             for file_name in files:
-                process_document(file_name)
+                clean_text, sections = process_document(file_name)
             print("\nBatch processing complete.")

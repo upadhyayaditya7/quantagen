@@ -4,12 +4,17 @@
     "ISSN: \\d{4}-\\d{4}",
     "Volume: \\d+ Issue: \\d+",
     "________________.*",
-    "IJRITCC \\| January 2014, Available @.*"
+    "IJRITCC \\| January 2014, Available @.*",
+    "\\d{2,3} \\| January 2014.*"
   ],
   "stop_markers": [
     "REFERENCES",
     "BIBLIOGRAPHY",
     "LITERATURE CITED",
     "WORKS CITED"
-  ]
+  ],
+  "section_markers": {
+    "abstract": ["ABSTRACT"],
+    "conclusion": ["CONCLUSION", "SUMMARY", "CONCLUDING REMARKS"]
+  }
 }
