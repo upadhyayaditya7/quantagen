@@ -40,7 +40,6 @@ def process_document(file_name: str):
         step2 = sieve_text(step1)
         
         # 3. Extract Metadata
-        # We perform this on the cleaned text to avoid headers/footers in the summary
         sections = extract_sections(step2)
         
         clean_token_count = get_token_count(step2)
@@ -58,14 +57,21 @@ def process_document(file_name: str):
         
         # 6. Output Audit Report
         print(f"\n--- Audit Report: {file_name} ---")
-        print(f"Raw Tokens:     {raw_token_count}")
-        print(f"Cleaned Tokens: {clean_token_count}")
-        print(f"Noise Removed:  {saved_tokens} tokens ({reduction_pct:.2f}% efficiency)")
-        if 'abstract' in sections: print(f"  [+] Extracted Abstract")
-        if 'conclusion' in sections: print(f"  [+] Extracted Conclusion")
-        print(f"Saved to:       {output_filename}")
         
-        # Returning both text and metadata dictionary for potential UI usage
+        # Smart categorization
+        doc_type = "Content-Dense Manual" if reduction_pct < 5 else "Noise-Heavy Research"
+        
+        print(f"Detected Format: {doc_type}")
+        print(f"Raw Tokens:      {raw_token_count}")
+        print(f"Cleaned Tokens:  {clean_token_count}")
+        print(f"Efficiency:      {reduction_pct:.2f}% ({saved_tokens} tokens removed)")
+        
+        # Metadata verification
+        abs_status = "Found" if 'abstract' in sections else "None"
+        con_status = "Found" if 'conclusion' in sections else "None"
+        print(f"Metadata:        Abstract: {abs_status} | Conclusion: {con_status}")
+        print(f"Saved to:        {output_filename}")
+        
         return step2, sections
         
     except Exception as e:

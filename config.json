@@ -5,13 +5,18 @@
     "Volume: \\d+ Issue: \\d+",
     "________________.*",
     "IJRITCC \\| January 2014, Available @.*",
-    "\\d{2,3} \\| January 2014.*"
+    "\\d{2,3} \\| January 2014.*",
+    "\\d{6} \\| \\d{4}\\.\\d{2}\\.\\d{2}",
+    "Send Feedback",
+    "ModelSim.*Standard Edition"
   ],
   "stop_markers": [
     "REFERENCES",
     "BIBLIOGRAPHY",
     "LITERATURE CITED",
-    "WORKS CITED"
+    "WORKS CITED",
+    "REVISION HISTORY",
+    "DOCUMENT VERSION"
   ],
   "section_markers": {
     "abstract": ["ABSTRACT"],
