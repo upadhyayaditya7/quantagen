@@ -1,14 +1,17 @@
 {
-  "noise_patterns": [
-    "International Journal on Recent and Innovation Trends in Computing and Communication.*",
-    "ISSN: \\d{4}-\\d{4}",
-    "Volume: \\d+ Issue: \\d+",
-    "________________.*",
-    "IJRITCC \\| January 2014, Available @.*",
-    "\\d{2,3} \\| January 2014.*",
-    "\\d{6} \\| \\d{4}\\.\\d{2}\\.\\d{2}",
-    "Send Feedback",
-    "ModelSim.*Standard Edition"
+  "structural_rules": {
+    "strip_top_n_percent": 0.05,
+    "strip_bottom_n_percent": 0.05
+  },
+  "global_noise_patterns": [
+    "^(?!\\s*$).*\\d{4}.*ISSN.*$",
+    "^(Page\\s+\\d+\\s+of\\s+\\d+)$",
+    "^(©\\s*\\d{4}.*)",
+    "^(.*\\d{6}\\s*\\|\\s*\\d{4}\\.\\d{2}\\.\\d{2}.*)",
+    "(?i)(confidential|proprietary|do not distribute|draft)",
+    "(?i)(available\\s+@\\s+http[s]?://\\S+)",
+    "_{3,}",
+    "(?i)ModelSim.*Standard Edition"
   ],
   "stop_markers": [
     "REFERENCES",
@@ -16,7 +19,10 @@
     "LITERATURE CITED",
     "WORKS CITED",
     "REVISION HISTORY",
-    "DOCUMENT VERSION"
+    "DOCUMENT VERSION",
+    "SPONSOR",
+    "APPENDIX",
+    "INDEX"
   ],
   "section_markers": {
     "abstract": ["ABSTRACT"],
