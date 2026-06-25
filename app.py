@@ -31,7 +31,8 @@ if uploaded_files:
             col1.metric("Raw Tokens", f"{raw_tokens:,}")
             col2.metric("Efficiency Gain", f"{efficiency:.2f}%")
             
-            st.text_area(f"Preview: {uploaded_file.name}", clean_text, height=500)
+            st.subheader("Document Preview")
+            st.code(clean_text, language=None, height=800)
             
             st.download_button(
                 label=f"Download {uploaded_file.name.replace('.pdf', '.txt')}",
