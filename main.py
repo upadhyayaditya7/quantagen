@@ -20,18 +20,18 @@ def sieve_text(raw_text):
     clean_text = strip_recurring_noise(clean_text)
     return clean_text
 
-def process_document(file_name: str):
-    input_folder = "inputs"
+def process_document(file_path: str):
+    # Dynamic category detection based on parent folder name
+    category = os.path.basename(os.path.dirname(file_path))
+    file_name = os.path.basename(file_path)
     output_folder = "outputs"
     
     if not os.path.exists(output_folder):
         os.makedirs(output_folder)
-        
-    input_path = os.path.join(input_folder, file_name)
     
     try:
         # 1. Extract raw text
-        doc = fitz.open(input_path)
+        doc = fitz.open(file_path)
         raw_text = "\n".join([page.get_text() for page in doc])
         raw_token_count = get_token_count(raw_text)
         
@@ -41,7 +41,6 @@ def process_document(file_name: str):
         
         # 3. Extract Metadata
         sections = extract_sections(step2)
-        
         clean_token_count = get_token_count(step2)
         
         # 4. Analyze impact
@@ -49,16 +48,16 @@ def process_document(file_name: str):
         reduction_pct = (saved_tokens / raw_token_count * 100) if raw_token_count > 0 else 0
         
         # 5. Save
-        clean_name = os.path.basename(file_name).replace('.pdf', '.txt')
-        output_filename = os.path.join(output_folder, f"cleaned_{clean_name}")
+        clean_name = file_name.replace('.pdf', '.txt')
+        output_filename = os.path.join(output_folder, f"cleaned_{category}_{clean_name}")
         
         with open(output_filename, "w", encoding="utf-8") as f:
             f.write(step2)
         
         # 6. Output Audit Report
         print(f"\n--- Audit Report: {file_name} ---")
+        print(f"Category:        {category}")
         
-        # Smart categorization
         doc_type = "Content-Dense Manual" if reduction_pct < 5 else "Noise-Heavy Research"
         
         print(f"Detected Format: {doc_type}")
@@ -66,7 +65,6 @@ def process_document(file_name: str):
         print(f"Cleaned Tokens:  {clean_token_count}")
         print(f"Efficiency:      {reduction_pct:.2f}% ({saved_tokens} tokens removed)")
         
-        # Metadata verification
         abs_status = "Found" if 'abstract' in sections else "None"
         con_status = "Found" if 'conclusion' in sections else "None"
         print(f"Metadata:        Abstract: {abs_status} | Conclusion: {con_status}")
@@ -75,10 +73,9 @@ def process_document(file_name: str):
         return step2, sections
         
     except Exception as e:
-        print(f"Failed to process {file_name}: {e}")
+        print(f"Failed to process {file_path}: {e}")
         return None, None
-    
-    
+
 def extract_text_from_stream(file_stream):
     doc = fitz.open(stream=file_stream.read(), filetype="pdf")
     return "\n".join([page.get_text() for page in doc])
@@ -90,17 +87,16 @@ def calc_efficiency(raw_text, clean_text):
     return (saved / raw * 100) if raw > 0 else 0
 
 if __name__ == "__main__":
-    input_folder = "inputs"
+    input_root = "inputs"
     
-    if not os.path.exists(input_folder):
-        print(f"Error: '{input_folder}' folder not found. Please create it and add your PDFs.")
+    if not os.path.exists(input_root):
+        print(f"Error: '{input_root}' folder not found.")
     else:
-        files = [f for f in os.listdir(input_folder) if f.lower().endswith(".pdf")]
-        
-        if not files:
-            print("No PDF files found in the 'inputs' folder.")
-        else:
-            print(f"Quantagen Engine v0.1.0: Found {len(files)} files. Starting batch processing...")
-            for file_name in files:
-                clean_text, sections = process_document(file_name)
-            print("\nBatch processing complete.")
+        print(f"Quantagen Engine v0.1.0: Starting recursive scan of {input_root}...")
+        # Recursive traversal of all subdirectories
+        for root, dirs, files in os.walk(input_root):
+            for file in files:
+                if file.lower().endswith(".pdf"):
+                    full_path = os.path.join(root, file)
+                    process_document(full_path)
+        print("\nBatch processing complete.")
