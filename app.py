@@ -32,7 +32,7 @@ if uploaded_files:
             col2.metric("Efficiency Gain", f"{efficiency:.2f}%")
             
             st.subheader("Document Preview")
-            st.code(clean_text, language=None, height=800)
+            st.code(clean_text, language=None, height=600)
             
             st.download_button(
                 label=f"Download {uploaded_file.name.replace('.pdf', '.txt')}",

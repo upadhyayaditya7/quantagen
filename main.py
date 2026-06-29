@@ -9,11 +9,23 @@ def get_token_count(text: str, model: str = "gpt-4o") -> int:
     return len(encoder.encode(text))
 
 def filter_noise(text: str) -> str:
-    """Removes common PDF boilerplate that inflates token counts."""
-    text = re.sub(r'Page \d+ of \d+|Page \d+', '', text, flags=re.IGNORECASE)
-    text = re.sub(r'http[s]?://\S+', '', text)
-    text = re.sub(r'\.{3,}', '', text)
-    return text.strip()
+    """Universal structural filter: Removes noise based on layout density."""
+    clean_lines = []
+    for line in text.splitlines():
+        stripped = line.strip()
+        if not stripped: continue
+            
+        # 1. Structural check: Lines that are short and contain numbers
+        if re.match(r'^(\d+|[a-zA-Z\s]+\s?\d+/?\d*)$', stripped, re.IGNORECASE):
+            continue
+            
+        # 2. Density check: Removes lines that are mostly symbols (non-textual noise)
+        content_chars = re.sub(r'[a-zA-Z\d\s]', '', stripped)
+        if len(stripped) > 0 and (len(content_chars) / len(stripped)) > 0.5:
+            continue
+            
+        clean_lines.append(stripped)
+    return "\n".join(clean_lines)
 
 def sieve_text(raw_text):
     clean_text = truncate_at_stop_markers(raw_text)
@@ -21,13 +33,10 @@ def sieve_text(raw_text):
     return clean_text
 
 def process_document(file_path: str):
-    # Dynamic category detection based on parent folder name
     category = os.path.basename(os.path.dirname(file_path))
     file_name = os.path.basename(file_path)
     output_folder = "outputs"
-    
-    if not os.path.exists(output_folder):
-        os.makedirs(output_folder)
+    os.makedirs(output_folder, exist_ok=True)
     
     try:
         # 1. Extract raw text
@@ -35,40 +44,33 @@ def process_document(file_path: str):
         raw_text = "\n".join([page.get_text() for page in doc])
         raw_token_count = get_token_count(raw_text)
         
-        # 2. Process (Filtering & Sieve)
-        step1 = filter_noise(raw_text)
-        step2 = sieve_text(step1)
+        # 2. Process
+        step2 = sieve_text(filter_noise(raw_text))
         
-        # 3. Extract Metadata
+        # 3. Debugging (Character level check)
+        removed_chars = len(raw_text) - len(step2)
+        print(f"DEBUG: Removed {removed_chars} characters from the document.")
+        
+        # 4. Extract Metadata
         sections = extract_sections(step2)
         clean_token_count = get_token_count(step2)
         
-        # 4. Analyze impact
-        saved_tokens = raw_token_count - clean_token_count
+        # 5. Accurate Impact Analysis
+        saved_tokens = max(0, raw_token_count - clean_token_count)
         reduction_pct = (saved_tokens / raw_token_count * 100) if raw_token_count > 0 else 0
         
-        # 5. Save
+        # 6. Save final result
         clean_name = file_name.replace('.pdf', '.txt')
         output_filename = os.path.join(output_folder, f"cleaned_{category}_{clean_name}")
         
         with open(output_filename, "w", encoding="utf-8") as f:
             f.write(step2)
         
-        # 6. Output Audit Report
+        # 7. Audit Report
         print(f"\n--- Audit Report: {file_name} ---")
-        print(f"Category:        {category}")
-        
-        doc_type = "Content-Dense Manual" if reduction_pct < 5 else "Noise-Heavy Research"
-        
-        print(f"Detected Format: {doc_type}")
         print(f"Raw Tokens:      {raw_token_count}")
         print(f"Cleaned Tokens:  {clean_token_count}")
-        print(f"Efficiency:      {reduction_pct:.2f}% ({saved_tokens} tokens removed)")
-        
-        abs_status = "Found" if 'abstract' in sections else "None"
-        con_status = "Found" if 'conclusion' in sections else "None"
-        print(f"Metadata:        Abstract: {abs_status} | Conclusion: {con_status}")
-        print(f"Saved to:        {output_filename}")
+        print(f"Efficiency:      {reduction_pct:.4f}% ({saved_tokens} tokens removed)")
         
         return step2, sections
         
