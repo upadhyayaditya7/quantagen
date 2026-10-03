@@ -1,7 +1,7 @@
 import streamlit as st
 import pandas as pd
 from main import (
-    filter_noise, sieve_text, get_token_count, 
+    clean_pipeline, get_token_count,
     extract_text_from_stream, calc_efficiency
 )
 
@@ -18,9 +18,9 @@ if uploaded_files:
     
     for i, uploaded_file in enumerate(uploaded_files):
         with tabs[i]:
-            # Process
+            # Process (same canonical pipeline as the CLI)
             raw_text = extract_text_from_stream(uploaded_file)
-            clean_text = sieve_text(raw_text)
+            clean_text = clean_pipeline(raw_text)
             
             # Metrics
             raw_tokens = get_token_count(raw_text)

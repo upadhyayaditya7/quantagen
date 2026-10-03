@@ -2,8 +2,9 @@ import os
 import fitz
 import tiktoken
 import re
-from rules.parser import strip_recurring_noise, truncate_at_stop_markers, extract_sections 
-
+from rules.parser import (
+    strip_recurring_noise, truncate_at_stop_markers, extract_sections, load_config
+)
 def get_token_count(text: str, model: str = "gpt-4o") -> int:
     encoder = tiktoken.encoding_for_model(model)
     return len(encoder.encode(text))
@@ -34,10 +35,53 @@ def filter_noise(text: str) -> str:
         clean_lines.append(stripped)
     return "\n".join(clean_lines)
 
+def trim_structural_edges(text: str) -> str:
+    """Blunt front/back-matter trim driven by config.json structural_rules.
+
+    Removes the top n% and bottom n% of the raw text, where cover pages,
+    copyright blocks, tables of contents, and colophons typically live.
+    No-op when both percentages are 0 or absent.
+    """
+    rules = load_config().get("structural_rules", {})
+    top = float(rules.get("strip_top_n_percent", 0) or 0)
+    bottom = float(rules.get("strip_bottom_n_percent", 0) or 0)
+    if top <= 0 and bottom <= 0:
+        return text
+    n = len(text)
+    start = int(n * top)
+    end = n - int(n * bottom) if bottom > 0 else n
+    if start >= end:
+        return text
+    return text[start:end]
+
+def clean_pipeline(raw_text: str, stage_tokens: dict | None = None) -> str:
+    """The single canonical cleaning pipeline, shared by CLI and UI.
+
+    Order: structural edge trim -> line-level noise filter -> stop-marker
+    truncation -> config-driven recurring-noise patterns.
+
+    If `stage_tokens` is a dict, it is filled with the tokens removed at each
+    stage, so the audit can show where the savings actually come from.
+    """
+    stages = (
+        ("structural trim", trim_structural_edges),
+        ("line filter", filter_noise),
+        ("stop-marker truncation", truncate_at_stop_markers),
+        ("recurring-noise patterns", strip_recurring_noise),
+    )
+    text = raw_text
+    prev_tokens = get_token_count(text)
+    for name, fn in stages:
+        text = fn(text)
+        if stage_tokens is not None:
+            tokens = get_token_count(text)
+            stage_tokens[name] = max(0, prev_tokens - tokens)
+            prev_tokens = tokens
+    return text
+
 def sieve_text(raw_text):
-    clean_text = truncate_at_stop_markers(raw_text)
-    clean_text = strip_recurring_noise(clean_text)
-    return clean_text
+    """Backwards-compatible alias for clean_pipeline()."""
+    return clean_pipeline(raw_text)
 
 def process_document(file_path: str):
     category = os.path.basename(os.path.dirname(file_path))
@@ -51,17 +95,15 @@ def process_document(file_path: str):
         raw_text = "\n".join([page.get_text() for page in doc])
         raw_token_count = get_token_count(raw_text)
         
-        # 2. Process
-        step2 = sieve_text(filter_noise(raw_text))
+        # 2. Process (single canonical pipeline, same as the UI)
+        stage_tokens = {}
+        step2 = clean_pipeline(raw_text, stage_tokens)
         
-        # 3. Debugging (Character level check)
-        removed_chars = len(raw_text) - len(step2)
-        print(f"DEBUG: Removed {removed_chars} characters from the document.")
+        # 3. Impact breakdown (printed in the audit report below)
         
         # 4. Extract Metadata
         sections = extract_sections(step2)
         clean_token_count = get_token_count(step2)
-        
         # 5. Accurate Impact Analysis
         saved_tokens = max(0, raw_token_count - clean_token_count)
         reduction_pct = (saved_tokens / raw_token_count * 100) if raw_token_count > 0 else 0
@@ -78,11 +120,20 @@ def process_document(file_path: str):
         print(f"Raw Tokens:      {raw_token_count}")
         print(f"Cleaned Tokens:  {clean_token_count}")
         print(f"Efficiency:      {reduction_pct:.4f}% ({saved_tokens} tokens removed)")
+        for name, n in stage_tokens.items():
+            if n:
+                print(f"  - {name:<26}{n:>7} tokens")
+        if sections:
+            print("Sections:        " + ", ".join(f"{k} ({len(v)} chars)" for k, v in sections.items()))
+        else:
+            print("Sections:        none detected")
         
         return step2, sections
         
     except Exception as e:
+        import traceback
         print(f"Failed to process {file_path}: {e}")
+        traceback.print_exc()
         return None, None
 
 def extract_text_from_stream(file_stream):
