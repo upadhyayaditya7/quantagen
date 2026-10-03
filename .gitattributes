@@ -1,0 +1,11 @@
+# Normalize line endings: LF in the repo, LF on commit, native on checkout
+* text=auto
+
+# Source files always LF
+*.py text eol=lf
+*.json text eol=lf
+*.md text eol=lf
+*.txt text eol=lf
+
+# Windows-only files
+*.bat text eol=crlf
