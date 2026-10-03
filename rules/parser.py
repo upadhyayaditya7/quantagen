@@ -13,13 +13,26 @@ def strip_recurring_noise(text):
     return text
 
 def truncate_at_stop_markers(text):
+    """Truncate the document at the first standalone stop-marker heading.
+
+    The marker must start its own line (case-insensitive) and may only be
+    followed by a colon, a section letter ("Appendix A"), or a short number
+    before the line ends. Prose like "...for any given\nindex r." or
+    "the index of refraction" can therefore never trigger truncation.
+    """
     config = load_config()
     markers = config.get("stop_markers", [])
-    if markers:
-        pattern = r"\n(" + "|".join(markers) + r")\s*"
-        match = re.search(pattern, text, re.IGNORECASE)
-        if match:
-            return text[:match.start()]
+    if not markers:
+        return text
+
+    alternatives = "|".join(re.escape(m) for m in markers)
+    # Line starts with the marker; only a heading-style tail is allowed:
+    # optional spaces, optional colon, optional section letter / short number.
+    heading_pattern = rf"^\s*(?:{alternatives})\b\s*:?\s*[A-Za-z]?\d{{0,3}}\s*$"
+
+    match = re.search(heading_pattern, text, flags=re.IGNORECASE | re.MULTILINE)
+    if match:
+        return text[:match.start()]
     return text
 
 def extract_sections(text):
