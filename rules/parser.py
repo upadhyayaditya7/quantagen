@@ -1,8 +1,11 @@
 import re
 import json
+import os
+
+_CONFIG_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'config.json')
 
 def load_config():
-    with open('config.json', 'r', encoding='utf-8') as f:
+    with open(_CONFIG_PATH, 'r', encoding='utf-8') as f:
         return json.load(f)
 
 def strip_recurring_noise(text):
