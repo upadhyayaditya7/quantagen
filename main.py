@@ -9,7 +9,13 @@ def get_token_count(text: str, model: str = "gpt-4o") -> int:
     return len(encoder.encode(text))
 
 def filter_noise(text: str) -> str:
-    """Universal structural filter: Removes noise based on layout density."""
+    r"""Universal structural filter: Removes noise based on layout density.
+
+    Unicode-aware: letters and digits from any script count as content, so
+    non-Latin text (Japanese, Cyrillic, Arabic, ...) is preserved. Only lines
+    that are genuinely symbol-dense are removed. Underscore runs count as
+    symbols (they are layout, not content).
+    """
     clean_lines = []
     for line in text.splitlines():
         stripped = line.strip()
@@ -19,9 +25,10 @@ def filter_noise(text: str) -> str:
         if re.match(r'^(\d+|[a-zA-Z\s]+\s?\d+/?\d*)$', stripped, re.IGNORECASE):
             continue
             
-        # 2. Density check: Removes lines that are mostly symbols (non-textual noise)
-        content_chars = re.sub(r'[a-zA-Z\d\s]', '', stripped)
-        if len(stripped) > 0 and (len(content_chars) / len(stripped)) > 0.5:
+        # 2. Density check: Removes lines that are mostly symbols (non-textual noise).
+        #    [^\W_] = Unicode letters/digits; whitespace also counts as content.
+        content_chars = len(re.findall(r"[^\W_]|\s", stripped))
+        if len(stripped) > 0 and ((len(stripped) - content_chars) / len(stripped)) > 0.5:
             continue
             
         clean_lines.append(stripped)
