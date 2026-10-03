@@ -52,10 +52,14 @@ def extract_sections(text):
             sections['abstract'] = match.group(1).strip()
             break
             
-    # Extract Conclusion
+    # Extract Conclusion. Bounded: the capture stops at the next numbered
+    # section or a standalone ALL-CAPS heading, so a per-chapter "Summary"
+    # heading in a book does not swallow the rest of the document.
     for marker in markers.get("conclusion", []):
-        pattern = rf"{marker}\.?\s*(.*)"
-        match = re.search(pattern, text, re.IGNORECASE | re.DOTALL)
+        # (?i:...) scopes case-insensitivity to the marker itself; the
+        # lookahead stays case-sensitive so only real ALL-CAPS headings bound it.
+        pattern = rf"(?i:{marker})\.?\s*(.*?)(?=\n\s*\d|\n\s*[A-Z][A-Z \-]{{3,}}\s*\n|\Z)"
+        match = re.search(pattern, text, re.DOTALL)
         if match:
             sections['conclusion'] = match.group(1).strip()
             break
