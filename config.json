@@ -8,7 +8,7 @@
     "^(Page\\s+\\d+\\s+of\\s+\\d+)$",
     "^(©\\s*\\d{4}.*)",
     "^(.*\\d{6}\\s*\\|\\s*\\d{4}\\.\\d{2}\\.\\d{2}.*)",
-    "(?i)(confidential|proprietary|do not distribute|draft)",
+    "(?i)^(confidential|proprietary|do not distribute|draft)\\b.{0,40}$",
     "(?i)(available\\s+@\\s+http[s]?://\\S+)",
     "_{3,}",
     "(?i)ModelSim.*Standard Edition"

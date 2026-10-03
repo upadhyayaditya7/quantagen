@@ -2,14 +2,14 @@ import re
 import json
 
 def load_config():
-    with open('config.json', 'r') as f:
+    with open('config.json', 'r', encoding='utf-8') as f:
         return json.load(f)
 
 def strip_recurring_noise(text):
     config = load_config()
-    patterns = config.get("noise_patterns", [])
+    patterns = config.get("global_noise_patterns", [])
     for pattern in patterns:
-        text = re.sub(pattern, "", text, flags=re.IGNORECASE)
+        text = re.sub(pattern, "", text, flags=re.IGNORECASE | re.MULTILINE)
     return text
 
 def truncate_at_stop_markers(text):
