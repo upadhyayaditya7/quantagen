@@ -1,4 +1,7 @@
 import os
+import json
+from datetime import datetime, timezone
+
 import fitz
 import tiktoken
 import re
@@ -9,13 +12,16 @@ def get_token_count(text: str, model: str = "gpt-4o") -> int:
     encoder = tiktoken.encoding_for_model(model)
     return len(encoder.encode(text))
 
-def filter_noise(text: str) -> str:
+def filter_noise(text: str, losses=None) -> str:
     r"""Universal structural filter: Removes noise based on layout density.
 
     Unicode-aware: letters and digits from any script count as content, so
     non-Latin text (Japanese, Cyrillic, Arabic, ...) is preserved. Only lines
     that are genuinely symbol-dense are removed. Underscore runs count as
     symbols (they are layout, not content).
+
+    If `losses` is a list, every removed line is appended to it as a ledger
+    entry (stage, reason, removed preview, char count).
     """
     clean_lines = []
     for line in text.splitlines():
@@ -24,23 +30,38 @@ def filter_noise(text: str) -> str:
             
         # 1. Structural check: Lines that are short and contain numbers
         if re.match(r'^(\d+|[a-zA-Z\s]+\s?\d+/?\d*)$', stripped, re.IGNORECASE):
+            if losses is not None:
+                losses.append({
+                    "stage": "line filter",
+                    "reason": "page-number-like line",
+                    "removed": stripped[:160],
+                    "chars": len(stripped),
+                })
             continue
             
         # 2. Density check: Removes lines that are mostly symbols (non-textual noise).
         #    [^\W_] = Unicode letters/digits; whitespace also counts as content.
         content_chars = len(re.findall(r"[^\W_]|\s", stripped))
         if len(stripped) > 0 and ((len(stripped) - content_chars) / len(stripped)) > 0.5:
+            if losses is not None:
+                losses.append({
+                    "stage": "line filter",
+                    "reason": "symbol-dense line (>50% non-letter characters)",
+                    "removed": stripped[:160],
+                    "chars": len(stripped),
+                })
             continue
             
         clean_lines.append(stripped)
     return "\n".join(clean_lines)
 
-def trim_structural_edges(text: str) -> str:
+def trim_structural_edges(text: str, losses=None) -> str:
     """Blunt front/back-matter trim driven by config.json structural_rules.
 
     Removes the top n% and bottom n% of the raw text, where cover pages,
     copyright blocks, tables of contents, and colophons typically live.
-    No-op when both percentages are 0 or absent.
+    No-op when both percentages are 0 or absent. Removed spans go to
+    `losses` when provided.
     """
     rules = load_config().get("structural_rules", {})
     top = float(rules.get("strip_top_n_percent", 0) or 0)
@@ -48,13 +69,25 @@ def trim_structural_edges(text: str) -> str:
     if top <= 0 and bottom <= 0:
         return text
     n = len(text)
+    head = text[:int(n * top)] if top > 0 else ""
     start = int(n * top)
     end = n - int(n * bottom) if bottom > 0 else n
+    tail = text[end:] if bottom > 0 else ""
     if start >= end:
         return text
+    if losses is not None:
+        for part, label in ((head, "head trim"), (tail, "tail trim")):
+            if part:
+                losses.append({
+                    "stage": "structural trim",
+                    "reason": label,
+                    "removed": part[:160],
+                    "chars": len(part),
+                })
     return text[start:end]
 
-def clean_pipeline(raw_text: str, stage_tokens: dict | None = None) -> str:
+def clean_pipeline(raw_text: str, stage_tokens: dict | None = None,
+                   losses: list | None = None) -> str:
     """The single canonical cleaning pipeline, shared by CLI and UI.
 
     Order: structural edge trim -> line-level noise filter -> stop-marker
@@ -62,8 +95,10 @@ def clean_pipeline(raw_text: str, stage_tokens: dict | None = None) -> str:
 
     If `stage_tokens` is a dict, it is filled with the tokens removed at each
     stage, so the audit can show where the savings actually come from.
+    If `losses` is a list, every removed span is appended to it as a loss-
+    ledger entry: {stage, reason, removed (<=160-char preview), chars, tokens}. 
     """
-    stages = (
+    stage_fns = (
         ("structural trim", trim_structural_edges),
         ("line filter", filter_noise),
         ("stop-marker truncation", truncate_at_stop_markers),
@@ -71,12 +106,16 @@ def clean_pipeline(raw_text: str, stage_tokens: dict | None = None) -> str:
     )
     text = raw_text
     prev_tokens = get_token_count(text)
-    for name, fn in stages:
-        text = fn(text)
+    for name, fn in stage_fns:
+        text = fn(text, losses) if losses is not None else fn(text)
         if stage_tokens is not None:
             tokens = get_token_count(text)
             stage_tokens[name] = max(0, prev_tokens - tokens)
             prev_tokens = tokens
+    if losses is not None:
+        for entry in losses:
+            if "tokens" not in entry:
+                entry["tokens"] = get_token_count(entry["removed"])
     return text
 
 def sieve_text(raw_text):
@@ -97,7 +136,8 @@ def process_document(file_path: str):
         
         # 2. Process (single canonical pipeline, same as the UI)
         stage_tokens = {}
-        step2 = clean_pipeline(raw_text, stage_tokens)
+        losses = []
+        step2 = clean_pipeline(raw_text, stage_tokens, losses)
         
         # 3. Impact breakdown (printed in the audit report below)
         
@@ -107,6 +147,19 @@ def process_document(file_path: str):
         # 5. Accurate Impact Analysis
         saved_tokens = max(0, raw_token_count - clean_token_count)
         reduction_pct = (saved_tokens / raw_token_count * 100) if raw_token_count > 0 else 0
+        
+        # 5b. Loss ledger entry for the machine-readable audit trail
+        document_report = {
+            "document": file_name,
+            "category": category,
+            "raw_tokens": raw_token_count,
+            "cleaned_tokens": clean_token_count,
+            "reduction_pct": round(reduction_pct, 4),
+            "stage_tokens": stage_tokens,
+            "sections": sections,
+            "losses": losses,
+        }
+        DOCUMENT_REPORTS.append(document_report)
         
         # 6. Save final result
         clean_name = file_name.replace('.pdf', '.txt')
@@ -127,6 +180,8 @@ def process_document(file_path: str):
             print("Sections:        " + ", ".join(f"{k} ({len(v)} chars)" for k, v in sections.items()))
         else:
             print("Sections:        none detected")
+        if losses:
+            print(f"Loss ledger:     {len(losses)} spans removed (full trail in report.json)")
         
         return step2, sections
         
@@ -135,6 +190,22 @@ def process_document(file_path: str):
         print(f"Failed to process {file_path}: {e}")
         traceback.print_exc()
         return None, None
+
+# Per-document audit records, accumulated across a batch run.
+DOCUMENT_REPORTS = []
+
+
+def write_report(path="outputs/report.json"):
+    """Persist the accumulated loss ledger / audit trail as report.json."""
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    with open(path, "w", encoding="utf-8") as f:
+        json.dump({
+            "engine_version": "0.1.0",
+            "generated_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+            "documents": DOCUMENT_REPORTS,
+        }, f, indent=2, ensure_ascii=False)
+    return path
+
 
 def extract_text_from_stream(file_stream):
     doc = fitz.open(stream=file_stream.read(), filetype="pdf")
@@ -159,4 +230,8 @@ if __name__ == "__main__":
                 if file.lower().endswith(".pdf"):
                     full_path = os.path.join(root, file)
                     process_document(full_path)
+        if DOCUMENT_REPORTS:
+            report_path = write_report()
+            print(f"\nAudit trail written to {report_path} "
+                  f"({len(DOCUMENT_REPORTS)} document(s)).")
         print("\nBatch processing complete.")

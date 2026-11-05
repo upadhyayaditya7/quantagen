@@ -8,14 +8,35 @@ def load_config():
     with open(_CONFIG_PATH, 'r', encoding='utf-8') as f:
         return json.load(f)
 
-def strip_recurring_noise(text):
+def strip_recurring_noise(text, losses=None):
     config = load_config()
     patterns = config.get("global_noise_patterns", [])
     for pattern in patterns:
+        before = text
         text = re.sub(pattern, "", text, flags=re.IGNORECASE | re.MULTILINE)
+        if losses is not None and text != before:
+            for line in _missing_lines(before, text):
+                losses.append({
+                    "stage": "recurring-noise patterns",
+                    "reason": f"matched configured pattern {pattern}",
+                    "removed": line[:160],
+                    "chars": len(line),
+                })
     return text
 
-def truncate_at_stop_markers(text):
+
+def _missing_lines(before, after):
+    """Lines present in `before` but absent from `after` (occurrence-counted).
+
+    Called descriptive of removals; line-preserving regexes are the only
+    kind this project's config ships, so per-line attribution stays exact.
+    """
+    from collections import Counter
+
+    surplus = Counter(before.splitlines()) - Counter(after.splitlines())
+    return [line for line, n in surplus.items() for _ in range(n)]
+
+def truncate_at_stop_markers(text, losses=None):
     """Truncate the document at the first standalone stop-marker heading.
 
     The marker must start its own line (case-insensitive) and may only be
@@ -35,10 +56,18 @@ def truncate_at_stop_markers(text):
 
     match = re.search(heading_pattern, text, flags=re.IGNORECASE | re.MULTILINE)
     if match:
+        removed = text[match.start():]
+        if losses is not None:
+            losses.append({
+                "stage": "stop-marker truncation",
+                "reason": f"truncated at standalone heading {removed.splitlines()[0]!r}",
+                "removed": removed[-160:],
+                "chars": len(removed),
+            })
         return text[:match.start()]
     return text
 
-def extract_sections(text):
+def extract_sections(text, losses=None):
     config = load_config()
     sections = {}
     markers = config.get("section_markers", {})
