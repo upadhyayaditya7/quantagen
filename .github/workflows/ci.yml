@@ -26,4 +26,22 @@ jobs:
           python -m pip install pytest
 
       - name: Run test suite
-        run: python -m pytest -q
+        run: |
+          set -o pipefail
+          python -m pytest tests -q 2>&1 | tee pytest-run.log
+
+      # Preserve the tee'd exit status with pipefail; publish the full
+      # pytest output to the (publicly readable) job summary when the run
+      # fails, so the failing traceback can be diagnosed without accessing
+      # admin-only raw logs.
+      - name: Publish failure diagnostics
+        if: failure()
+        run: |
+          {
+            echo "## Pytest output (${PYTHON_VERSION:-unknown})"
+            echo '```'
+            tail -c 30000 pytest-run.log
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+        env:
+          PYTHON_VERSION: ${{ matrix.python-version }}
