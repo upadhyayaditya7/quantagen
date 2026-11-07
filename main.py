@@ -8,6 +8,7 @@ import re
 from rules.parser import (
     strip_recurring_noise, truncate_at_stop_markers, extract_sections, load_config
 )
+from rules import layout
 def get_token_count(text: str, model: str = "gpt-4o") -> int:
     encoder = tiktoken.encoding_for_model(model)
     return len(encoder.encode(text))
@@ -28,8 +29,11 @@ def filter_noise(text: str, losses=None) -> str:
         stripped = line.strip()
         if not stripped: continue
             
-        # 1. Structural check: Lines that are short and contain numbers
-        if re.match(r'^(\d+|[a-zA-Z\s]+\s?\d+/?\d*)$', stripped, re.IGNORECASE):
+        # 1. Structural check: Lines that are short and contain numbers.
+        #    The length cap matters: after layout reflow a line is a whole
+        #    paragraph, and "cost of the project 2500" must not be mistaken
+        #    for a page number.
+        if len(stripped) <= 40 and re.match(r'^(\d+|[a-zA-Z\s]+\s?\d+/?\d*)$', stripped, re.IGNORECASE):
             if losses is not None:
                 losses.append({
                     "stage": "line filter",
@@ -129,17 +133,19 @@ def process_document(file_path: str):
     os.makedirs(output_folder, exist_ok=True)
     
     try:
-        # 1. Extract raw text
+        # 1. Extract raw text (naive per-page stream: the honest raw baseline)
         doc = fitz.open(file_path)
         raw_text = "\n".join([page.get_text() for page in doc])
         raw_token_count = get_token_count(raw_text)
-        
-        # 2. Process (single canonical pipeline, same as the UI)
+
+        # 2. Layout extraction: reading order, margin furniture, paragraph reflow
         stage_tokens = {}
         losses = []
-        step2 = clean_pipeline(raw_text, stage_tokens, losses)
-        
-        # 3. Impact breakdown (printed in the audit report below)
+        extracted = layout.extract_text(doc, losses)
+        stage_tokens["layout extraction"] = max(0, raw_token_count - get_token_count(extracted))
+
+        # 3. Process (single canonical pipeline, same as the UI)
+        step2 = clean_pipeline(extracted, stage_tokens, losses)
         
         # 4. Extract Metadata
         sections = extract_sections(step2)
@@ -209,7 +215,7 @@ def write_report(path="outputs/report.json"):
 
 def extract_text_from_stream(file_stream):
     doc = fitz.open(stream=file_stream.read(), filetype="pdf")
-    return "\n".join([page.get_text() for page in doc])
+    return layout.extract_text(doc)
 
 def calc_efficiency(raw_text, clean_text):
     raw = get_token_count(raw_text)

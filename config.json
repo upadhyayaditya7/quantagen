@@ -3,6 +3,17 @@
     "strip_top_n_percent": 0.05,
     "strip_bottom_n_percent": 0.05
   },
+  "layout": {
+    "top_band_pct": 0.08,
+    "bottom_band_pct": 0.08,
+    "page_number_band_pct": 0.15,
+    "furniture_min_pages": 3,
+    "furniture_page_ratio": 0.5,
+    "max_furniture_chars": 240,
+    "min_gutter_pt": 8.0,
+    "row_gap_pt": 12.0,
+    "stitch_paragraphs": true
+  },
   "global_noise_patterns": [
     "^(?!\\s*$).*\\d{4}.*ISSN.*$",
     "^(Page\\s+\\d+\\s+of\\s+\\d+)$",
