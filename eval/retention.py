@@ -57,6 +57,21 @@ if _ROOT not in sys.path:
 
 import fitz  # noqa: E402  (after the sys.path bootstrap)
 
+
+def extractor_version() -> str:
+    """Which PDF engine produced these numbers.
+
+    Extraction is the one dependency that changes the denominator: a different
+    MuPDF build splits figure text into different lines, so retention moves
+    without a single line of pipeline code changing. Recording the build makes
+    that visible instead of mysterious.
+    """
+    try:
+        import pymupdf
+        return f"PyMuPDF {pymupdf.__version__}"
+    except Exception:
+        return getattr(fitz, "__doc__", "PyMuPDF unknown").strip()
+
 from main import filter_noise, trim_structural_edges  # noqa: E402
 from rules import layout  # noqa: E402
 from rules.parser import strip_recurring_noise, truncate_at_stop_markers  # noqa: E402
@@ -377,6 +392,8 @@ def main(argv=None) -> int:
         print(f"No PDFs found under {args.inputs}", file=sys.stderr)
         return 2
 
+    print(f"Extractor: {extractor_version()}")
+
     reports = []
     for path in paths:
         report = audit_pdf(path, gold)
@@ -388,6 +405,7 @@ def main(argv=None) -> int:
         with open(args.out, "w", encoding="utf-8") as handle:
             json.dump({
                 "generated_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+                "extractor": extractor_version(),
                 "stage_chain": [name for name, _ in STAGE_CHAIN],
                 "documents": reports,
             }, handle, indent=2)

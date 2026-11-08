@@ -104,6 +104,23 @@ def test_context_coverage_tolerates_reflow_but_not_deletion():
     assert retention.context_coverage(context, "Something else entirely.") < 0.2
 
 
+# ------------------------------------------------------------- reproducibility
+
+def test_extractor_is_pinned_and_reportable():
+    # The floors are calibrated against one extractor build. A newer PyMuPDF
+    # splits figure text differently and moves the book's number retention by
+    # ~3 points with no code change, so a loose "PyMuPDF>=1.24" is how CI came
+    # to disagree with the numbers in README.md. The pin is a test, not a habit.
+    version = retention.extractor_version()
+    assert version.startswith("PyMuPDF ") and version != "PyMuPDF unknown"
+
+    with open("requirements.txt", encoding="utf-8") as handle:
+        pins = [line.strip() for line in handle
+                if line.strip().lower().startswith("pymupdf")]
+    assert len(pins) == 1
+    assert "==" in pins[0]
+
+
 # ------------------------------------------------------------- real documents
 
 def test_gold_contexts_exist_in_the_source_documents():

@@ -80,6 +80,8 @@ Token savings say nothing about what was thrown away, so `eval/retention.py` mea
 
 Numbers are compared as a multiset (a value appearing twice must survive twice), entities and figure/table/citation references as sets. An answer-bearing passage counts as retained only when its answer survives **and** at least 60% of the sentence's 5-word shingles survive, so a lucky matching number elsewhere cannot pass as a kept answer.
 
+The figures below were measured with **PyMuPDF 1.27.2.3**, which `requirements.txt` pins. Extraction is the one dependency that moves the denominator: PyMuPDF 2.x splits figure text into more lines, which takes the book's number retention to 94.5% without a single line of pipeline code changing (entities, references and all 18 answer passages still survive). So the pin is load-bearing — upgrading the extractor means re-measuring these numbers and the CI floors, not just bumping a version. The audit prints the build it used and records it in `outputs/retention.json`.
+
 | | MLBasicsBook.pdf | researchpaperOnSustainableDev.pdf |
 |---|---|---|
 | Numbers retained | 6,058 / 6,226 → **97.30%** | 64 / 64 → **100.00%** |
@@ -109,7 +111,7 @@ quantagen/
 ├── eval/retention.py  # retention audit: numbers/entities/references/answer spans + stage blame
 ├── eval/gold.json     # 18 curated answer-bearing passages (quoted from the raw extraction)
 ├── config.json        # structural rules, layout thresholds, noise patterns, stop markers
-├── tests/             # 80 offline pytest tests (8 modules); real-token smoke test included
+├── tests/             # 81 offline pytest tests (8 modules); real-token smoke test included
 ├── .github/workflows/ # CI: pytest (Python 3.11 + 3.13) + retention floors
 ├── inputs/            # sample PDFs (a Springer textbook + a research paper)
 ├── outputs/           # cleaned .txt, report.json, retention.json (gitignored; generated)
@@ -201,7 +203,7 @@ All tunables live in [`config.json`](config.json):
 6. **Section extraction is heuristic.** In books with per-chapter "Summary" headings, the extracted "conclusion" is the first such section's text, not the book's conclusion. Fine for papers, imperfect for books.
 7. **Detection is English-centric.** Non-Latin *text survives cleaning*, but the stop markers, section markers and noise patterns themselves target English/journal conventions.
 8. **Loss ledger entries are previews, not full text.** Each entry carries exact char/token accounting, but records at most a 160-char preview of the removed text — enough to eyeball *what* and *why* per span.
-9. **`process_document()` still catches broad exceptions** (it prints the full traceback). The pipeline itself (`clean_pipeline`) raises normally, and 80 offline tests + CI guard all documented behaviors.
+9. **`process_document()` still catches broad exceptions** (it prints the full traceback). The pipeline itself (`clean_pipeline`) raises normally, and 81 offline tests + CI guard all documented behaviors.
 
 ## Fixed issues
 

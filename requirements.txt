@@ -1,4 +1,10 @@
-PyMuPDF>=1.24
-tiktoken>=0.7
+# Pinned on purpose: the retention floors in eval/retention.py and the numbers
+# quoted in README.md were measured against these exact builds. PyMuPDF 2.x
+# splits figure text (chart tick labels) into more lines, which moves
+# MLBasicsBook.pdf number retention from 97.3% to 94.5% while every entity,
+# reference and curated answer span still survives. Upgrading is fine, but it
+# requires re-measuring the README, not just bumping the version.
+PyMuPDF==1.27.2.3
+tiktoken==0.13.0
 streamlit>=1.36
 pandas>=2.0
