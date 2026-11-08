@@ -1,0 +1,107 @@
+{
+  "_comment": [
+    "Hand-curated answer-bearing passages for eval/retention.py.",
+    "Each item is a question a reader would plausibly ask, the short answer, and",
+    "the source sentence quoted from the RAW extraction (not from the cleaned",
+    "output, so the set cannot be biased toward what the pipeline keeps).",
+    "A passage counts as retained only when the answer survives AND at least 60%",
+    "of the sentence's 5-word shingles survive, so a stray matching number",
+    "elsewhere cannot be counted as a kept answer."
+  ],
+  "documents": {
+    "researchpaperOnSustainableDev.pdf": [
+      {
+        "question": "How many SDGs does the paper classify into four broad themes?",
+        "answer": "17",
+        "context": "This paper classifies all the 17 SDGs into four broad themes and the literatures had been reviewed on basis of themes and SDGs."
+      },
+      {
+        "question": "Which year's study examined sustainable urban development in Darjeeling?",
+        "answer": "2014",
+        "context": "The study by (Mell and Sturzaker 2014) had researched on the sustainable urban development in land constrained area of Darjeeling."
+      },
+      {
+        "question": "Which year's study looked at commercial banks supporting women entrepreneurship?",
+        "answer": "2014",
+        "context": "With regards to the SDG of \u201c Gender equality\u201d, the role of commercial banks in supporting women entrepreneurship and improving gender equality in doing business was studied by (Deepa 2014)."
+      },
+      {
+        "question": "Which year was the integrated hydrogeological groundwater study conducted in?",
+        "answer": "2016",
+        "context": "An integrated hydrogeological study for ground water management was conducted by (Madhnure, Peddi, and Allani 2016)."
+      },
+      {
+        "question": "By which year are the food security and nutrition targets to be achieved?",
+        "answer": "2030",
+        "context": "The study concluded by recommending for reforms in coordination and approach for achieving 2030 targets of food security and nutrition."
+      },
+      {
+        "question": "Which year's study suggested biogas potential for India's energy basket?",
+        "answer": "2015",
+        "context": "Biogas potential as an energy solution to energy basket of India was suggested in the study of (Lohan et al. 2015)."
+      },
+      {
+        "question": "Which year were two hybrid energy models for rural regions studied?",
+        "answer": "2016",
+        "context": "The possibilities and benefits of two hybrid energy model for rural and remote regions was studied by (Renu Sharma and Goel 2016)."
+      },
+      {
+        "question": "Which year's study highlighted non communicable disease prevention?",
+        "answer": "2018",
+        "context": "The need for preventing non communicable diseases for sustainable development was highlighted in the study of (John 2018)."
+      }
+    ],
+    "MLBasicsBook.pdf": [
+      {
+        "question": "How many input neurons does the example ANN have?",
+        "answer": "10",
+        "context": "Consider a ANN with n = 10 input neurons following by three hidden layers consisting of 4, 9 and 3 nodes."
+      },
+      {
+        "question": "Which figure illustrates the basic idea of dimensionality reduction?",
+        "answer": "9.1",
+        "context": "Figure 9.1 illustrates the basic idea of dimensionality reduction methods."
+      },
+      {
+        "question": "Which citation is given for an approach similar to problem (10.7)?",
+        "answer": "23",
+        "context": "The maximization problem (10.7) for obtaining optimal explanations is similar to the approach in [23]."
+      },
+      {
+        "question": "Which equation gives the maximum likelihood estimate that is not invertible?",
+        "answer": "4.20",
+        "context": "The maximum likelihood estimate b\u03a3 (4.20) is not invertible whenever m < n."
+      },
+      {
+        "question": "Which chapter discusses using the gradient for efficient parameter search?",
+        "answer": "5",
+        "context": "Chapter 5 discusses methods that use the concept ot a gradient to implement an e\uFB03cient search for useful parameter vectors w \u2208Rn."
+      },
+      {
+        "question": "Which section covers logistic regression sharing a hypothesis space with linear regression?",
+        "answer": "3.1",
+        "context": "Note that logistic regression uses the same hypothesis space as linear regression (see Section 3.1)."
+      },
+      {
+        "question": "Which equation does gradient descent solve iteratively?",
+        "answer": "5.13",
+        "context": "We can therefore use GD (5.6) to solve (5.13) iteratively, i.e., by constructing a sequence of parameter vectors that converge to an optimal parameter vector w."
+      },
+      {
+        "question": "Which figure shows hiking tours as data points?",
+        "answer": "2.2",
+        "context": "Mountain hikers might be interested in data points that represent di\uFB00erent hiking tours (see Figure 2.2)."
+      },
+      {
+        "question": "Which equation holds the condition that depends on both the model and true parameter?",
+        "answer": "6.25",
+        "context": "Note that the condition (6.25) depends on both, the model parameter l and the true parameter vector w."
+      },
+      {
+        "question": "Which of the update equations modifies cluster means without increasing clustering error?",
+        "answer": "8.7",
+        "context": "As can be veri\uFB01ed easily, the updates (8.6) and (8.7) always modify (update) the cluster means or assignments in such a way that the clustering error (8.3) is never increased."
+      }
+    ]
+  }
+}
