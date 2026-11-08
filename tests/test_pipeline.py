@@ -79,6 +79,30 @@ def test_trim_removes_tail_percent(monkeypatch):
     assert trim_structural_edges(text) == "A" + "x" * 179
 
 
+def test_trim_snaps_to_line_boundaries(monkeypatch):
+    # A raw character offset lands mid-word ("different" lost its "diffe"),
+    # so the kept text began with a fragment of real content.
+    cfg = dict(parser.load_config())
+    cfg["structural_rules"] = {"strip_top_n_percent": 0.1, "strip_bottom_n_percent": 0.1}
+    monkeypatch.setattr(main, "load_config", lambda: cfg)
+
+    lines = [f"line {i} of the document." for i in range(10)]
+    text = "\n".join(lines)  # 10% of the chars would cut inside line 0 / line 9
+    trimmed = trim_structural_edges(text)
+
+    assert trimmed.startswith("line 1 of the document.")
+    assert trimmed.endswith("line 8 of the document.")
+
+
+def test_trim_never_returns_a_fragment_of_a_word(monkeypatch):
+    cfg = dict(parser.load_config())
+    cfg["structural_rules"] = {"strip_top_n_percent": 0.2, "strip_bottom_n_percent": 0}
+    monkeypatch.setattr(main, "load_config", lambda: cfg)
+
+    text = "alpha beta gamma\ndelta epsilon zeta\ntheta iota kappa"
+    assert trim_structural_edges(text).split()[0] == "delta"
+
+
 def test_trim_is_noop_when_both_zero(monkeypatch):
     cfg = dict(parser.load_config())
     cfg["structural_rules"] = {"strip_top_n_percent": 0, "strip_bottom_n_percent": 0}

@@ -13,6 +13,11 @@ def get_token_count(text: str, model: str = "gpt-4o") -> int:
     encoder = tiktoken.encoding_for_model(model)
     return len(encoder.encode(text))
 
+# A line that carries nothing but a page number: "12", "253", "Page 7".
+# Kept short (<= 3 digits) so four-digit years and numbered headings survive;
+# layout removes real margin page numbers by geometry, this is the safety net.
+_PAGE_FURNITURE_LINE = re.compile(r"^(?:\d{1,3}|Page\s+\d{1,4})$", re.IGNORECASE)
+
 def filter_noise(text: str, losses=None) -> str:
     r"""Universal structural filter: Removes noise based on layout density.
 
@@ -29,11 +34,12 @@ def filter_noise(text: str, losses=None) -> str:
         stripped = line.strip()
         if not stripped: continue
             
-        # 1. Structural check: Lines that are short and contain numbers.
-        #    The length cap matters: after layout reflow a line is a whole
-        #    paragraph, and "cost of the project 2500" must not be mistaken
-        #    for a page number.
-        if len(stripped) <= 40 and re.match(r'^(\d+|[a-zA-Z\s]+\s?\d+/?\d*)$', stripped, re.IGNORECASE):
+        # 1. Structural check: a line that is *only* a bare numeral (or
+        #    "Page N") is page furniture. Deliberately narrow: layout already
+        #    removes margin page numbers by geometry, and the older, broader
+        #    pattern (`^[a-zA-Z\s]+\s?\d+$`) also deleted headings such as
+        #    "Chapter 1" and standalone years like "2020" from the body.
+        if len(stripped) <= 40 and _PAGE_FURNITURE_LINE.match(stripped):
             if losses is not None:
                 losses.append({
                     "stage": "line filter",
@@ -73,12 +79,21 @@ def trim_structural_edges(text: str, losses=None) -> str:
     if top <= 0 and bottom <= 0:
         return text
     n = len(text)
-    head = text[:int(n * top)] if top > 0 else ""
-    start = int(n * top)
+    start = int(n * top) if top > 0 else 0
     end = n - int(n * bottom) if bottom > 0 else n
-    tail = text[end:] if bottom > 0 else ""
-    if start >= end:
+    # Snap both boundaries to line starts. A character offset lands mid-word
+    # ("...different" became "rent weights ...") and mid-number, so the kept
+    # text would begin and end with a fragment of real content.
+    if start > 0:
+        newline = text.find("\n", start)
+        start = newline + 1 if newline != -1 else start
+    if end < n:
+        newline = text.rfind("\n", 0, end)
+        end = newline if newline != -1 else end
+    if start >= end or not text[start:end].strip():
         return text
+    head = text[:start] if top > 0 else ""
+    tail = text[end:] if bottom > 0 else ""
     if losses is not None:
         for part, label in ((head, "head trim"), (tail, "tail trim")):
             if part:

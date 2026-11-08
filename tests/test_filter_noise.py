@@ -6,6 +6,15 @@ def test_standalone_page_number_lines_are_dropped():
     assert "Page 3" not in filter_noise("Page 3\nBody.")
 
 
+def test_headed_lines_with_numbers_are_content_not_furniture():
+    # Regression: the old pattern `^[a-zA-Z\s]+\s?\d+$` deleted real content --
+    # "Chapter 1" headings, TOC entries and standalone years -- because it
+    # matched any short text-plus-number line. Layout removes margin page
+    # numbers by geometry; this rule only catches bare numerals now.
+    kept = "Chapter 1\nGlossary 253\n2020\n1.2 Theory\nFigure 3"
+    assert filter_noise(kept) == kept
+
+
 def test_prose_lines_are_kept():
     prose = "The committee drafts reports quarterly."
     assert filter_noise(prose) == prose
