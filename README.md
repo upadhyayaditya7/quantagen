@@ -47,6 +47,7 @@ Both `main.py` (CLI) and `app.py` (UI) call the same `layout.extract_text()` + `
 - **Page-furniture removal with attribution** — repeating margin lines (journal names, `Published By:` footers, running titles) and page numbers are dropped from the top/bottom bands using document frequency, not hand-written regexes, and each drop is ledgered with the page count that justified it. A line that is the *document title* once but a *running head* on later pages is kept where it is content and dropped where it is furniture.
 - **Retention audit** (`eval/retention.py`) — the pipeline is lossy, so it proves what it kept: numbers, capitalised entities and figure/table/citation references are extracted before and after cleaning, every loss is attributed to the stage that caused it, and hand-curated answer-bearing passages (18 across the two samples) are checked for survival. Deliberate scope decisions (front/back-matter trim, reference truncation) are reported with their measured cost instead of being silently excused. CI fails the build if retention drops below its floors.
 - **Retrieval-fidelity benchmark** (`eval/retrieval.py`) — survival is not the same as findable, so the same 18 curated questions are BM25-ranked over raw, post-layout and cleaned text (hit@1/3/5, MRR). Cleaning measures retrieval-neutral on both samples — the book's MRR is unchanged, the paper's improves — while the index shrinks 12.5% and 45%. CI fails if cleaning ever makes a document harder to search.
+- **Head-to-head comparison** (`eval/compare.py`) — another extractor's output is scored on the same questions and metrics. Measured against `pymupdf4llm` 2.1: 34% fewer tokens on the book (17.5% below raw, versus 24.9% *above* raw), one more curated answer retained, and better MRR on both samples — with the unfair parts of that comparison written down rather than omitted.
 - **Recursive batch CLI** — walks `inputs/` for PDFs, processes each, prints a per-document audit report.
 - **Streamlit UI** (`app.py`) — multi-file upload, one tab per document with raw/cleaned token metrics, a 600px preview pane, per-file `.txt` download, and a batch summary table.
 - **Token accounting with stage breakdown** — raw vs. cleaned token counts via `tiktoken`, the reduction percentage, and *which stage* removed how many tokens. Savings are attributable, not just asserted.
@@ -126,6 +127,37 @@ python eval/retrieval.py           # audit inputs/, write outputs/retrieval.json
 python eval/retrieval.py --check   # exit non-zero if a retrieval floor is breached (CI runs this)
 ```
 
+## How it compares
+
+Numbers only persuade next to a baseline, so `eval/compare.py` puts another extractor's output through the same 18 questions, the same chunking and the same metrics. It is manual only: the other tool is never a project dependency and CI never runs it.
+
+| MLBasicsBook.pdf (288 pp, 10 questions) | tokens | vs raw | answer spans | hit@3 | MRR | wall clock |
+|---|---|---|---|---|---|---|
+| Raw PyMuPDF stream | 155,055 | — | 10/10 | 90.0% | 0.925 | — |
+| **Quantagen** | **127,878** | **−17.5%** | **10/10** | **90.0%** | **0.925** | **1.9 s** |
+| pymupdf4llm 2.1 | 193,676 | +24.9% | 9/10 | 90.0% | 0.833 | 100 s |
+
+| researchpaperOnSustainableDev.pdf (6 pp, 8 questions) | tokens | vs raw | answer spans | hit@3 | MRR | wall clock |
+|---|---|---|---|---|---|---|
+| Raw PyMuPDF stream | 8,540 | — | 8/8 | 100% | 0.917 | — |
+| **Quantagen** | **3,120** | **−63.5%** | **8/8** | **100%** | **0.938** | **0.1 s** |
+| pymupdf4llm 2.1 | 7,960 | −6.8% | 8/8 | 100% | 0.854 | 10 s |
+
+Quantagen's output is **34% smaller than pymupdf4llm's** on the book and **61% smaller** on the paper; it keeps every curated answer, where pymupdf4llm loses one (Equation 4.20 — its surrounding sentence survives only 44% of its 5-word shingles), and it ranks better on both documents.
+
+What that comparison does *not* say, in fairness to the alternative:
+
+- pymupdf4llm emits **Markdown** with headings and tables. Some of its extra tokens are that structure, and structure this pipeline does not produce is a real feature — it is roadmap item 2, not a rounding error.
+- Its 100 s on the book is **OCR on 7 pages** (RapidOCR), which Quantagen does not do at all, so the runtime gap is not a pure extraction-speed comparison.
+- Its output is larger than the raw stream (+24.9%); ours is smaller (−17.5%). Neither is automatically better — it depends on what is fed downstream.
+- **markitdown is not measured.** Its install pulls several hundred MB (magika/onnxruntime) and this machine had 113 MB free. Not measured is reported as not measured.
+- Both sides are scored on questions I authored, so treat the deltas as directional, not as a leaderboard.
+
+```bash
+python eval/compare.py --tool pymupdf4llm                  # needs pymupdf4llm installed locally
+python eval/compare.py --from-file "pymupdf4llm=out/{stem}.md"   # or score text you already have
+```
+
 ## Repository layout
 
 ```
@@ -136,9 +168,10 @@ quantagen/
 ├── rules/parser.py    # config-driven truncation, noise stripping, section extraction
 ├── eval/retention.py  # retention audit: numbers/entities/references/answer spans + stage blame
 ├── eval/retrieval.py  # retrieval fidelity: BM25 hit@k / MRR, raw vs post-layout vs cleaned
+├── eval/compare.py    # head-to-head against other extractors (manual, not in CI)
 ├── eval/gold.json     # 18 curated answer-bearing passages (quoted from the raw extraction)
 ├── config.json        # structural rules, layout thresholds, noise patterns, stop markers
-├── tests/             # 90 offline pytest tests (9 modules); real-token smoke test included
+├── tests/             # 93 offline pytest tests (10 modules); real-token smoke test included
 ├── .github/workflows/ # CI: pytest (Python 3.11 + 3.13) + retention and retrieval floors
 ├── inputs/            # sample PDFs (a Springer textbook + a research paper)
 ├── outputs/           # cleaned .txt, report.json, retention.json, retrieval.json (gitignored)
@@ -230,7 +263,7 @@ All tunables live in [`config.json`](config.json):
 6. **Section extraction is heuristic.** In books with per-chapter "Summary" headings, the extracted "conclusion" is the first such section's text, not the book's conclusion. Fine for papers, imperfect for books.
 7. **Detection is English-centric.** Non-Latin *text survives cleaning*, but the stop markers, section markers and noise patterns themselves target English/journal conventions.
 8. **Loss ledger entries are previews, not full text.** Each entry carries exact char/token accounting, but records at most a 160-char preview of the removed text — enough to eyeball *what* and *why* per span.
-9. **`process_document()` still catches broad exceptions** (it prints the full traceback). The pipeline itself (`clean_pipeline`) raises normally, and 90 offline tests + CI guard all documented behaviors.
+9. **`process_document()` still catches broad exceptions** (it prints the full traceback). The pipeline itself (`clean_pipeline`) raises normally, and 93 offline tests + CI guard all documented behaviors.
 
 ## Fixed issues
 
