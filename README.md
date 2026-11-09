@@ -46,6 +46,7 @@ Both `main.py` (CLI) and `app.py` (UI) call the same `layout.extract_text()` + `
 - **Layout-aware extraction** — PyMuPDF's per-page text is not reading order, so the raw stream is rebuilt: a recursive XY-cut reads two-column pages column by column and lifts running heads/footers out of the body, blocks keep their bounding boxes for margin analysis, hard-wrapped lines are rejoined, end-of-line hyphenation is repaired (`distri-` + `bution` → `distribution`), and paragraphs interrupted by a page break are stitched back together. On the bundled 288-page book this took the output from 9,018 hard-wrapped lines to 1,962 paragraphs, cutting mid-sentence line breaks from 3,692 to 39.
 - **Page-furniture removal with attribution** — repeating margin lines (journal names, `Published By:` footers, running titles) and page numbers are dropped from the top/bottom bands using document frequency, not hand-written regexes, and each drop is ledgered with the page count that justified it. A line that is the *document title* once but a *running head* on later pages is kept where it is content and dropped where it is furniture.
 - **Retention audit** (`eval/retention.py`) — the pipeline is lossy, so it proves what it kept: numbers, capitalised entities and figure/table/citation references are extracted before and after cleaning, every loss is attributed to the stage that caused it, and hand-curated answer-bearing passages (18 across the two samples) are checked for survival. Deliberate scope decisions (front/back-matter trim, reference truncation) are reported with their measured cost instead of being silently excused. CI fails the build if retention drops below its floors.
+- **Retrieval-fidelity benchmark** (`eval/retrieval.py`) — survival is not the same as findable, so the same 18 curated questions are BM25-ranked over raw, post-layout and cleaned text (hit@1/3/5, MRR). Cleaning measures retrieval-neutral on both samples — the book's MRR is unchanged, the paper's improves — while the index shrinks 12.5% and 45%. CI fails if cleaning ever makes a document harder to search.
 - **Recursive batch CLI** — walks `inputs/` for PDFs, processes each, prints a per-document audit report.
 - **Streamlit UI** (`app.py`) — multi-file upload, one tab per document with raw/cleaned token metrics, a 600px preview pane, per-file `.txt` download, and a batch summary table.
 - **Token accounting with stage breakdown** — raw vs. cleaned token counts via `tiktoken`, the reduction percentage, and *which stage* removed how many tokens. Savings are attributable, not just asserted.
@@ -100,6 +101,31 @@ python eval/retention.py           # audit inputs/, write outputs/retention.json
 python eval/retention.py --check   # exit non-zero if a retention floor is breached (CI runs this)
 ```
 
+## Can a retriever still find the answer?
+
+Retention proves the content survived; it cannot prove a retriever would surface it, because a number can sit in a chunk that nothing ever ranks. `eval/retrieval.py` asks the downstream question directly: the same 18 curated questions, chunked identically (120 words, 30-word overlap), ranked by BM25 over three versions of each document.
+
+| MLBasicsBook.pdf | raw | post-layout | cleaned |
+|---|---|---|---|
+| Chunks indexed | 1,085 | 1,085 | 949 |
+| hit@1 / hit@3 / hit@5 | 90.0% / 90.0% / 100% | 80.0% / 100.0% / 100% | 90.0% / 90.0% / 100% |
+| MRR | 0.925 | 0.883 | 0.925 |
+
+| researchpaperOnSustainableDev.pdf | raw | post-layout | cleaned |
+|---|---|---|---|
+| Chunks indexed | 49 | 47 | 27 |
+| hit@1 / hit@3 / hit@5 | 87.5% / 100% / 100% | 75.0% / 100% / 100% | 87.5% / 100% / 100% |
+| MRR | 0.917 | 0.854 | 0.938 |
+
+Cleaning is retrieval-neutral, not retrieval-damaging: the book keeps an identical MRR (0.925) and the paper improves slightly (0.917 → 0.938), while the index shrinks by 12.5% and 45% respectively. That is the claim worth making — every removed token was index space that bought nothing. One book question lands at rank 4 in both raw and cleaned text; the retention section above is where the costs of cleaning are disclosed. CI fails if cleaned hit@3 falls below 80% or cleaned MRR falls more than 0.01 below raw.
+
+Honest limits: BM25 is a lexical baseline, not a neural retriever, so this measures findability by the question's own words; 18 questions is a small sample; the chunk size is one common RAG default (a different size moves every score); and the bundled book is effectively single-column, so these numbers do not exercise layout's column-order fix — the paper's do.
+
+```bash
+python eval/retrieval.py           # audit inputs/, write outputs/retrieval.json
+python eval/retrieval.py --check   # exit non-zero if a retrieval floor is breached (CI runs this)
+```
+
 ## Repository layout
 
 ```
@@ -109,12 +135,13 @@ quantagen/
 ├── rules/layout.py    # reading order, page furniture, de-hyphenation, paragraph stitching
 ├── rules/parser.py    # config-driven truncation, noise stripping, section extraction
 ├── eval/retention.py  # retention audit: numbers/entities/references/answer spans + stage blame
+├── eval/retrieval.py  # retrieval fidelity: BM25 hit@k / MRR, raw vs post-layout vs cleaned
 ├── eval/gold.json     # 18 curated answer-bearing passages (quoted from the raw extraction)
 ├── config.json        # structural rules, layout thresholds, noise patterns, stop markers
-├── tests/             # 81 offline pytest tests (8 modules); real-token smoke test included
-├── .github/workflows/ # CI: pytest (Python 3.11 + 3.13) + retention floors
+├── tests/             # 90 offline pytest tests (9 modules); real-token smoke test included
+├── .github/workflows/ # CI: pytest (Python 3.11 + 3.13) + retention and retrieval floors
 ├── inputs/            # sample PDFs (a Springer textbook + a research paper)
-├── outputs/           # cleaned .txt, report.json, retention.json (gitignored; generated)
+├── outputs/           # cleaned .txt, report.json, retention.json, retrieval.json (gitignored)
 ├── requirements.txt   # dependencies
 └── LICENSE            # Apache-2.0
 ```
@@ -195,7 +222,7 @@ All tunables live in [`config.json`](config.json):
 
 ## Known limitations
 
-1. **Retention is a proxy for quality, not a measurement of it.** Numbers, entities, figure references and 18 curated passages are checked for survival; nothing yet measures whether answers computed from the cleaned text match answers from the raw text. A number can survive in a context that has become unreadable, and no metric here would notice. Treat retention as a floor, not a certificate.
+1. **Retention is a proxy for quality, not a measurement of it.** Numbers, entities, figure references and 18 curated passages are checked for survival; retrieval fidelity (`eval/retrieval.py`) then checks the passages are still findable, but nothing yet measures whether *answers computed* from the cleaned text match answers from the raw text. Treat retention as a floor, not a certificate.
 2. **Reading order is a heuristic, not a layout model.** The XY-cut needs a genuinely empty gutter to split columns, and it separates structural rows before columns. Table- or figure-like regions whose whitespace aligns are therefore read row-wise, and a multi-column page with an irregular gutter can fall back to top-to-bottom order. It fixes the common cases (papers, books); it is not a document-AI model.
 3. **Reflow is heuristic.** An end-of-line hyphen is only removed when the next line starts lowercase, so compound words split at a line break stay hyphenated. Paragraph stitching needs a long previous line and a lowercase continuation, so some page breaks remain visible (39 in the bundled book).
 4. **`structural_rules` is still a blunt instrument.** Trimming 5% off each end is right for documents with cover pages/colophons and wrong for documents without them: on the 6-page paper it also removes the title block and the start of the abstract (measured: 49 numbers and 51 entities). Margin-furniture detection now handles running heads and footers, but tables of contents and colophons are still the percent trim's job.
@@ -203,7 +230,7 @@ All tunables live in [`config.json`](config.json):
 6. **Section extraction is heuristic.** In books with per-chapter "Summary" headings, the extracted "conclusion" is the first such section's text, not the book's conclusion. Fine for papers, imperfect for books.
 7. **Detection is English-centric.** Non-Latin *text survives cleaning*, but the stop markers, section markers and noise patterns themselves target English/journal conventions.
 8. **Loss ledger entries are previews, not full text.** Each entry carries exact char/token accounting, but records at most a 160-char preview of the removed text — enough to eyeball *what* and *why* per span.
-9. **`process_document()` still catches broad exceptions** (it prints the full traceback). The pipeline itself (`clean_pipeline`) raises normally, and 81 offline tests + CI guard all documented behaviors.
+9. **`process_document()` still catches broad exceptions** (it prints the full traceback). The pipeline itself (`clean_pipeline`) raises normally, and 90 offline tests + CI guard all documented behaviors.
 
 ## Fixed issues
 
@@ -220,7 +247,7 @@ For the record — these shipped broken and were fixed after being reproduced ag
 
 ## Roadmap
 
-1. **Answer-accuracy evaluation** — the retention audit measures survival; the next step is QA retention (answer a question set from raw vs. cleaned text and report accuracy), which is what a real fidelity harness needs.
+1. **Model-based answer accuracy** — survival and findability are now both measured (retention audit + BM25 retrieval fidelity). What remains is scoring generated answers against the raw-text answers, which needs an API key and a judge, so it cannot gate CI; it belongs in a separate, clearly labelled harness.
 2. **Markdown re-emission** — paragraphs now survive extraction, so headings/lists/tables can be emitted as Markdown, improving downstream RAG retrieval.
 3. **Content-aware front/back-matter detection** — TOC and colophon detection to retire the blunt `structural_rules` percent trim, whose measured cost is now visible (49 numbers and 51 entities on a 6-page paper).
 4. **Packaging** — `pyproject.toml`, `pip install quantagen`, a proper `quantagen` CLI entry point, and fixture PDFs in the test suite.

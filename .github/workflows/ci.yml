@@ -38,6 +38,14 @@ jobs:
           set -o pipefail
           python eval/retention.py --check 2>&1 | tee retention-run.log
 
+      # Retention proves content survives. This proves it is still *findable*:
+      # the curated questions must retrieve their answer chunk from the cleaned
+      # text at least as well as from the raw extraction (see eval/retrieval.py).
+      - name: Retrieval floors
+        run: |
+          set -o pipefail
+          python eval/retrieval.py --check 2>&1 | tee retrieval-run.log
+
       # Preserve the tee'd exit status with pipefail; publish the full
       # pytest output to the (publicly readable) job summary when the run
       # fails, so the failing traceback can be diagnosed without accessing
@@ -46,10 +54,13 @@ jobs:
         if: failure()
         run: |
           {
-            echo "## Pytest output (${PYTHON_VERSION:-unknown})"
-            echo '```'
-            tail -c 30000 pytest-run.log
-            echo '```'
+            for log in pytest-run.log retention-run.log retrieval-run.log; do
+              [ -f "$log" ] || continue
+              echo "## $log (Python ${PYTHON_VERSION:-unknown})"
+              echo '```'
+              tail -c 30000 "$log"
+              echo '```'
+            done
           } >> "$GITHUB_STEP_SUMMARY"
         env:
           PYTHON_VERSION: ${{ matrix.python-version }}
