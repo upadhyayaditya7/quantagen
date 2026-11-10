@@ -1,4 +1,4 @@
-from main import filter_noise
+from quantagen.pipeline import filter_noise
 
 
 def test_standalone_page_number_lines_are_dropped():

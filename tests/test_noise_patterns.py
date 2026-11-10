@@ -1,4 +1,4 @@
-from rules.parser import strip_recurring_noise
+from quantagen.rules.parser import strip_recurring_noise
 
 
 def test_stamp_lines_removed():

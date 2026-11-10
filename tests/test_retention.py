@@ -12,8 +12,8 @@ import os
 
 import fitz
 
-import main
-import rules.parser as parser
+from quantagen import pipeline
+from quantagen.rules import parser
 from eval import retention
 
 GOLD_PATH = os.path.join("eval", "gold.json")
@@ -56,7 +56,7 @@ def test_stage_chain_reproduces_the_real_pipeline():
     # If clean_pipeline() ever gains, loses or reorders a stage, the audit
     # would silently measure a different pipeline. This is the tripwire.
     text = "\n".join(["Heading", "8", "Body line one 2019.", "______", "More 42 text."])
-    assert retention.stage_texts(text)[-1][1] == main.clean_pipeline(text)
+    assert retention.stage_texts(text)[-1][1] == pipeline.clean_pipeline(text)
 
 
 # ------------------------------------------------------------- forgiveness
@@ -64,7 +64,7 @@ def test_stage_chain_reproduces_the_real_pipeline():
 def test_scope_losses_are_reported_but_not_penalised(monkeypatch):
     cfg = copy.deepcopy(parser.load_config())
     cfg["structural_rules"] = {"strip_top_n_percent": 0.25, "strip_bottom_n_percent": 0}
-    monkeypatch.setattr(main, "load_config", lambda: cfg)
+    monkeypatch.setattr(pipeline, "load_config", lambda: cfg)
 
     text = "\n".join(["2019 front matter", "second line", "third line", "fourth line"])
     report = retention.audit_text(text)

@@ -7,8 +7,8 @@ builds a throwaway PDF with PyMuPDF to exercise the real extraction path.
 
 import fitz
 
-from rules import layout
-from rules.layout import Line, PageBlocks, TextBlock
+from quantagen.rules import layout
+from quantagen.rules.layout import Line, PageBlocks, TextBlock
 
 
 def make_block(rows, x0=50.0, x1=300.0, y0=100.0, step=12.0, size=10.0, bold=False):

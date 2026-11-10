@@ -44,7 +44,7 @@ from eval.retention import (  # noqa: E402
     extractor_version,
     stage_texts,
 )
-from rules import layout  # noqa: E402
+from quantagen.rules import layout  # noqa: E402
 
 # Retrieval settings. Deliberately boring RAG defaults: ~120-word chunks with a
 # 30-word overlap, top-5 cut-off. Changing them changes every number below, so

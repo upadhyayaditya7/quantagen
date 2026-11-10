@@ -1,3 +1,12 @@
+"""The extraction and cleaning pipeline: one implementation for CLI and UI.
+
+Stages, in order: raw PyMuPDF text -> layout-aware extraction (reading order,
+page furniture, reflow) -> structural edge trim -> line-level noise filter ->
+stop-marker truncation -> config-driven recurring-noise patterns. Every
+removal is optional-ledgered through `losses`, which is what makes the audit
+trail in outputs/report.json trustworthy rather than decorative.
+"""
+
 import os
 import json
 from datetime import datetime, timezone
@@ -5,10 +14,12 @@ from datetime import datetime, timezone
 import fitz
 import tiktoken
 import re
-from rules.parser import (
+
+from . import __version__
+from .rules.parser import (
     strip_recurring_noise, truncate_at_stop_markers, extract_sections, load_config
 )
-from rules import layout
+from .rules import layout
 def get_token_count(text: str, model: str = "gpt-4o") -> int:
     encoder = tiktoken.encoding_for_model(model)
     return len(encoder.encode(text))
@@ -141,10 +152,14 @@ def sieve_text(raw_text):
     """Backwards-compatible alias for clean_pipeline()."""
     return clean_pipeline(raw_text)
 
-def process_document(file_path: str):
+def process_document(file_path: str, output_folder: str = "outputs"):
+    """Extract, clean and audit one PDF; returns (cleaned_text, sections).
+
+    `output_folder` is where the cleaned .txt is written; the CLI exposes it as
+    --out so the function no longer assumes the current directory is a checkout.
+    """
     category = os.path.basename(os.path.dirname(file_path))
     file_name = os.path.basename(file_path)
-    output_folder = "outputs"
     os.makedirs(output_folder, exist_ok=True)
     
     try:
@@ -221,7 +236,7 @@ def write_report(path="outputs/report.json"):
     os.makedirs(os.path.dirname(path), exist_ok=True)
     with open(path, "w", encoding="utf-8") as f:
         json.dump({
-            "engine_version": "0.1.0",
+            "engine_version": __version__,
             "generated_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
             "documents": DOCUMENT_REPORTS,
         }, f, indent=2, ensure_ascii=False)
@@ -237,22 +252,3 @@ def calc_efficiency(raw_text, clean_text):
     clean = get_token_count(clean_text)
     saved = raw - clean
     return (saved / raw * 100) if raw > 0 else 0
-
-if __name__ == "__main__":
-    input_root = "inputs"
-    
-    if not os.path.exists(input_root):
-        print(f"Error: '{input_root}' folder not found.")
-    else:
-        print(f"Quantagen Engine v0.1.0: Starting recursive scan of {input_root}...")
-        # Recursive traversal of all subdirectories
-        for root, dirs, files in os.walk(input_root):
-            for file in files:
-                if file.lower().endswith(".pdf"):
-                    full_path = os.path.join(root, file)
-                    process_document(full_path)
-        if DOCUMENT_REPORTS:
-            report_path = write_report()
-            print(f"\nAudit trail written to {report_path} "
-                  f"({len(DOCUMENT_REPORTS)} document(s)).")
-        print("\nBatch processing complete.")

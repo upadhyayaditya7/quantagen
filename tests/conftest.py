@@ -2,12 +2,12 @@ import copy
 
 import pytest
 
-import main
-import rules.parser as parser
+from quantagen import pipeline
+from quantagen.rules import parser
 
 # Capture the real tiktoken-backed counter BEFORE any test replaces it,
 # so one opted-in test can still exercise the genuine encoder.
-_real_get_token_count = main.get_token_count
+_real_get_token_count = pipeline.get_token_count
 
 
 @pytest.fixture(autouse=True)
@@ -24,7 +24,7 @@ def offline_token_counter(monkeypatch):
         # empty-raw guard stays exercisable. len//4 keeps math deterministic.
         return len(text) // 4
 
-    monkeypatch.setattr(main, "get_token_count", cheap_count)
+    monkeypatch.setattr(pipeline, "get_token_count", cheap_count)
     yield
 
 
@@ -41,12 +41,12 @@ def hermetic_config(monkeypatch):
     cfg = copy.deepcopy(parser.load_config())
     cfg["structural_rules"] = {"strip_top_n_percent": 0, "strip_bottom_n_percent": 0}
     monkeypatch.setattr(parser, "load_config", lambda: cfg)
-    monkeypatch.setattr(main, "load_config", lambda: cfg)
+    monkeypatch.setattr(pipeline, "load_config", lambda: cfg)
     yield cfg
 
 
 @pytest.fixture
 def real_token_counter(monkeypatch):
     """Restore the genuine tiktoken-backed counter for one test."""
-    monkeypatch.setattr(main, "get_token_count", _real_get_token_count)
+    monkeypatch.setattr(pipeline, "get_token_count", _real_get_token_count)
     return _real_get_token_count

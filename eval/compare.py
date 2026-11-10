@@ -32,10 +32,10 @@ if _ROOT not in sys.path:
 
 import fitz  # noqa: E402  (after the sys.path bootstrap)
 
-import main  # noqa: E402
+from quantagen import pipeline  # noqa: E402
 from eval.retention import answer_span_recall, extractor_version, stage_texts  # noqa: E402
 from eval.retrieval import evaluate  # noqa: E402
-from rules import layout  # noqa: E402
+from quantagen.rules import layout  # noqa: E402
 
 TOOLS = {
     "pymupdf4llm": lambda path: __import__("pymupdf4llm").to_markdown(path),
@@ -61,7 +61,7 @@ def metrics(reference: str, text: str, items: list) -> dict:
     spans = answer_span_recall(reference, text, items)
     retrieval = evaluate(items, text)
     return {
-        "tokens": main.get_token_count(text),
+        "tokens": pipeline.get_token_count(text),
         "chars": len(text),
         "answer_spans_retained": spans["retained"],
         "answer_spans_checked": spans["checked"],

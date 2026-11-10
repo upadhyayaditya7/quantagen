@@ -1,9 +1,9 @@
 import os
 import re
 
-import main
-import rules.parser as parser
-from main import calc_efficiency, clean_pipeline, sieve_text, trim_structural_edges
+from quantagen import pipeline
+from quantagen.rules import parser
+from quantagen.pipeline import calc_efficiency, clean_pipeline, sieve_text, trim_structural_edges
 
 
 # ---------------------------------------------------------------- parity
@@ -13,7 +13,7 @@ def test_ui_imports_the_cli_pipeline():
     # call the same clean_pipeline() the CLI uses.
     with open("app.py", "r", encoding="utf-8") as f:
         src = f.read()
-    assert re.search(r"from main import", src)
+    assert re.search(r"from quantagen.pipeline import", src)
     assert "clean_pipeline" in src
 
 
@@ -55,8 +55,8 @@ def test_stage_tokens_sum_to_total_savings():
 
 
 def main_token_count(text):
-    # Uses the (mocked) counter main itself sees, so the math is consistent.
-    return main.get_token_count(text)
+    # Uses the (mocked) counter the pipeline itself sees, so the math is consistent.
+    return pipeline.get_token_count(text)
 
 
 # ------------------------------------------------- structural trim (direct)
@@ -64,8 +64,8 @@ def main_token_count(text):
 def test_trim_removes_head_percent(monkeypatch):
     cfg = dict(parser.load_config())
     cfg["structural_rules"] = {"strip_top_n_percent": 0.1, "strip_bottom_n_percent": 0}
-    # trim_structural_edges resolves its config through main's reference.
-    monkeypatch.setattr(main, "load_config", lambda: cfg)
+    # trim_structural_edges resolves its config through the pipeline module.
+    monkeypatch.setattr(pipeline, "load_config", lambda: cfg)
     text = "x" * 200
     assert trim_structural_edges(text) == "x" * 180
 
@@ -73,7 +73,7 @@ def test_trim_removes_head_percent(monkeypatch):
 def test_trim_removes_tail_percent(monkeypatch):
     cfg = dict(parser.load_config())
     cfg["structural_rules"] = {"strip_top_n_percent": 0, "strip_bottom_n_percent": 0.1}
-    monkeypatch.setattr(main, "load_config", lambda: cfg)
+    monkeypatch.setattr(pipeline, "load_config", lambda: cfg)
     # int(200 * 0.1) == 20 chars removed from the tail.
     text = "A" + "x" * 198 + "B"
     assert trim_structural_edges(text) == "A" + "x" * 179
@@ -84,7 +84,7 @@ def test_trim_snaps_to_line_boundaries(monkeypatch):
     # so the kept text began with a fragment of real content.
     cfg = dict(parser.load_config())
     cfg["structural_rules"] = {"strip_top_n_percent": 0.1, "strip_bottom_n_percent": 0.1}
-    monkeypatch.setattr(main, "load_config", lambda: cfg)
+    monkeypatch.setattr(pipeline, "load_config", lambda: cfg)
 
     lines = [f"line {i} of the document." for i in range(10)]
     text = "\n".join(lines)  # 10% of the chars would cut inside line 0 / line 9
@@ -97,7 +97,7 @@ def test_trim_snaps_to_line_boundaries(monkeypatch):
 def test_trim_never_returns_a_fragment_of_a_word(monkeypatch):
     cfg = dict(parser.load_config())
     cfg["structural_rules"] = {"strip_top_n_percent": 0.2, "strip_bottom_n_percent": 0}
-    monkeypatch.setattr(main, "load_config", lambda: cfg)
+    monkeypatch.setattr(pipeline, "load_config", lambda: cfg)
 
     text = "alpha beta gamma\ndelta epsilon zeta\ntheta iota kappa"
     assert trim_structural_edges(text).split()[0] == "delta"
@@ -106,7 +106,7 @@ def test_trim_never_returns_a_fragment_of_a_word(monkeypatch):
 def test_trim_is_noop_when_both_zero(monkeypatch):
     cfg = dict(parser.load_config())
     cfg["structural_rules"] = {"strip_top_n_percent": 0, "strip_bottom_n_percent": 0}
-    monkeypatch.setattr(main, "load_config", lambda: cfg)
+    monkeypatch.setattr(pipeline, "load_config", lambda: cfg)
     text = "untouched"
     assert trim_structural_edges(text) == text
 
@@ -114,7 +114,7 @@ def test_trim_is_noop_when_both_zero(monkeypatch):
 def test_trim_returns_original_when_it_would_delete_everything(monkeypatch):
     cfg = dict(parser.load_config())
     cfg["structural_rules"] = {"strip_top_n_percent": 0.9, "strip_bottom_n_percent": 0.9}
-    monkeypatch.setattr(main, "load_config", lambda: cfg)
+    monkeypatch.setattr(pipeline, "load_config", lambda: cfg)
     text = "tiny"
     assert trim_structural_edges(text) == text
 

@@ -1,7 +1,7 @@
 import json
 
-import main
-from main import clean_pipeline, trim_structural_edges
+from quantagen import pipeline
+from quantagen.pipeline import clean_pipeline, trim_structural_edges
 
 
 def test_ledger_records_page_number_line_with_reason():
@@ -53,9 +53,9 @@ def test_ledger_records_truncation_with_heading_reason():
 
 
 def test_ledger_records_structural_trim_head_and_tail(monkeypatch):
-    cfg = dict(main.load_config())
+    cfg = dict(pipeline.load_config())
     cfg["structural_rules"] = {"strip_top_n_percent": 0.1, "strip_bottom_n_percent": 0.1}
-    monkeypatch.setattr(main, "load_config", lambda: cfg)
+    monkeypatch.setattr(pipeline, "load_config", lambda: cfg)
     text = "H" * 100 + "T" * 100
     losses = []
     trim_structural_edges(text, losses=losses)

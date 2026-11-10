@@ -72,9 +72,9 @@ def extractor_version() -> str:
     except Exception:
         return getattr(fitz, "__doc__", "PyMuPDF unknown").strip()
 
-from main import filter_noise, trim_structural_edges  # noqa: E402
-from rules import layout  # noqa: E402
-from rules.parser import strip_recurring_noise, truncate_at_stop_markers  # noqa: E402
+from quantagen.pipeline import filter_noise, trim_structural_edges  # noqa: E402
+from quantagen.rules import layout  # noqa: E402
+from quantagen.rules.parser import strip_recurring_noise, truncate_at_stop_markers  # noqa: E402
 
 # Same order as clean_pipeline(). A test asserts this chain reproduces the
 # pipeline byte-for-byte, so the audit can never drift from the real code.

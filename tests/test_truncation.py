@@ -1,4 +1,4 @@
-from main import clean_pipeline
+from quantagen.pipeline import clean_pipeline
 
 
 def _ending(s: str) -> str:

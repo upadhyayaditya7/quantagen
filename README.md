@@ -6,7 +6,7 @@
 
 Quantagen extracts text from research PDFs, rebuilds it in reading order, removes layout noise (running heads, footers, page numbers, boilerplate), truncates reference/appendix sections, and reports *both* halves of the claim: how many tokens it saved **and** how much of the document's numbers, entities and figure references survived. It ships as a CLI batch runner and a Streamlit web UI, and both run the **same** pipeline.
 
-> **Status: early-stage / experimental.** This is a working proof-of-concept (~1,300 lines of application code), not a production tool. Its savings and retention numbers are honest and reproducible, but retention is a *proxy* metric — there is no answer-accuracy evaluation yet. See [Known limitations](#known-limitations).
+> **Status: early-stage / experimental.** This is a working proof-of-concept (~1,000 lines of application code), not a production tool. Its savings and retention numbers are honest and reproducible, but retention is a *proxy* metric — there is no answer-accuracy evaluation yet. See [Known limitations](#known-limitations).
 
 ---
 
@@ -18,16 +18,16 @@ PDF (PyMuPDF)
    ▼
 layout.extract_text()           ← reading order via recursive XY-cut (columns, rows)
    │  margin furniture dropped · hard wraps joined · words de-hyphenated
-   │  paragraphs stitched across page breaks (rules/layout.py)
+   │  paragraphs stitched across page breaks (quantagen/rules/layout.py)
    ▼
-trim_structural_edges()         ← config-driven % trim of document head/tail (main.py)
+trim_structural_edges()         ← config-driven % trim of document head/tail (pipeline.py)
    │
    ▼
-filter_noise()                  ← Unicode-aware line-level filter (main.py)
+filter_noise()                  ← Unicode-aware line-level filter (pipeline.py)
    │  drops stray page numbers, symbol-dense lines; keeps non-Latin text
    ▼
 truncate_at_stop_markers()      ← cuts at standalone REFERENCES / APPENDIX / INDEX headings
-   │                               (rules/parser.py; prose like "index r." can never fire it)
+   │                               (quantagen/rules/parser.py; prose like "index r." can never fire it)
    ▼
 strip_recurring_noise()         ← config-driven regex cleanup from config.json
    │
@@ -39,7 +39,7 @@ strip_recurring_noise()         ← config-driven regex cleanup from config.json
    └──► abstract/conclusion extraction (printed in the CLI audit)
 ```
 
-Both `main.py` (CLI) and `app.py` (UI) call the same `layout.extract_text()` + `clean_pipeline()`, so their outputs are byte-identical for the same input.
+The `quantagen` CLI (`quantagen/cli.py`) and `app.py` (UI) both call the same `layout.extract_text()` + `clean_pipeline()`, so their outputs are byte-identical for the same input.
 
 ## Features
 
@@ -48,13 +48,13 @@ Both `main.py` (CLI) and `app.py` (UI) call the same `layout.extract_text()` + `
 - **Retention audit** (`eval/retention.py`) — the pipeline is lossy, so it proves what it kept: numbers, capitalised entities and figure/table/citation references are extracted before and after cleaning, every loss is attributed to the stage that caused it, and hand-curated answer-bearing passages (18 across the two samples) are checked for survival. Deliberate scope decisions (front/back-matter trim, reference truncation) are reported with their measured cost instead of being silently excused. CI fails the build if retention drops below its floors.
 - **Retrieval-fidelity benchmark** (`eval/retrieval.py`) — survival is not the same as findable, so the same 18 curated questions are BM25-ranked over raw, post-layout and cleaned text (hit@1/3/5, MRR). Cleaning measures retrieval-neutral on both samples — the book's MRR is unchanged, the paper's improves — while the index shrinks 12.5% and 45%. CI fails if cleaning ever makes a document harder to search.
 - **Head-to-head comparison** (`eval/compare.py`) — another extractor's output is scored on the same questions and metrics. Measured against `pymupdf4llm` 2.1: 34% fewer tokens on the book (17.5% below raw, versus 24.9% *above* raw), one more curated answer retained, and better MRR on both samples — with the unfair parts of that comparison written down rather than omitted.
-- **Recursive batch CLI** — walks `inputs/` for PDFs, processes each, prints a per-document audit report.
+- **Installable console script** — `pip install -e .` puts a `quantagen` command on PATH: `quantagen` scans `./inputs`, `quantagen report.pdf papers/ --out build` takes explicit files and directories and writes cleaned text plus the audit trail wherever you point it. The same entry point runs without the script via `python -m quantagen`.
 - **Streamlit UI** (`app.py`) — multi-file upload, one tab per document with raw/cleaned token metrics, a 600px preview pane, per-file `.txt` download, and a batch summary table.
 - **Token accounting with stage breakdown** — raw vs. cleaned token counts via `tiktoken`, the reduction percentage, and *which stage* removed how many tokens. Savings are attributable, not just asserted.
 - **Loss ledger (`outputs/report.json`)** — every removed span is recorded with the stage that removed it, a human-readable reason, a ≤160-char preview, and its char/token counts. Cleaning is auditable span-by-span, not just summarized.
 - **Unicode-aware filtering** — letters from any script (Japanese, Cyrillic, Arabic, …) count as content; only genuinely symbol-dense lines are dropped.
 - **Heading-safe truncation** — stop markers must start their own line and be heading-shaped, so a sentence containing the word "index" cannot truncate a document mid-prose.
-- **Config-driven rules** (`config.json`) — noise regexes, stop markers, layout thresholds and section markers live outside the code. `config.json` is located relative to the package, so you can run from any directory.
+- **Config-driven rules** (`config.json`) — noise regexes, stop markers, layout thresholds and section markers live outside the code. Resolution order is `$QUANTAGEN_CONFIG`, then `./config.json`, then the copy shipped inside the package, so an installed CLI is self-contained *and* a project can tune the rules without touching site-packages.
 
 ## Measured effect of layout-aware extraction
 
@@ -161,28 +161,32 @@ python eval/compare.py --from-file "pymupdf4llm=out/{stem}.md"   # or score text
 ## Repository layout
 
 ```
-quantagen/
-├── main.py            # CLI entrypoint, clean_pipeline(), filter_noise(), token/audit helpers
-├── app.py             # Streamlit UI (uses the same extraction + pipeline)
-├── rules/layout.py    # reading order, page furniture, de-hyphenation, paragraph stitching
-├── rules/parser.py    # config-driven truncation, noise stripping, section extraction
-├── eval/retention.py  # retention audit: numbers/entities/references/answer spans + stage blame
-├── eval/retrieval.py  # retrieval fidelity: BM25 hit@k / MRR, raw vs post-layout vs cleaned
-├── eval/compare.py    # head-to-head against other extractors (manual, not in CI)
-├── eval/gold.json     # 18 curated answer-bearing passages (quoted from the raw extraction)
-├── config.json        # structural rules, layout thresholds, noise patterns, stop markers
-├── tests/             # 93 offline pytest tests (10 modules); real-token smoke test included
-├── .github/workflows/ # CI: pytest (Python 3.11 + 3.13) + retention and retrieval floors
-├── inputs/            # sample PDFs (a Springer textbook + a research paper)
-├── outputs/           # cleaned .txt, report.json, retention.json, retrieval.json (gitignored)
-├── requirements.txt   # dependencies
-└── LICENSE            # Apache-2.0
+quantagen/                  # the installable package
+├── cli.py                   # console entry point: quantagen [PATH ...] [--out DIR]
+├── pipeline.py              # clean_pipeline(), filter_noise(), token/audit helpers
+├── rules/layout.py          # reading order, page furniture, de-hyphenation, paragraph stitching
+├── rules/parser.py          # config resolution, truncation, noise stripping, section extraction
+├── config.json              # packaged default rules (kept identical to the root copy by a test)
+└── __main__.py              # `python -m quantagen`
+app.py                       # Streamlit UI (same extraction + pipeline)
+eval/retention.py            # retention audit: numbers/entities/references/answer spans + stage blame
+eval/retrieval.py            # retrieval fidelity: BM25 hit@k / MRR, raw vs post-layout vs cleaned
+eval/compare.py              # head-to-head against other extractors (manual, not in CI)
+eval/gold.json               # 18 curated answer-bearing passages (quoted from the raw extraction)
+config.json                  # the editable rules file for a checkout
+pyproject.toml               # packaging, console script, pinned dependencies
+requirements.txt             # pinned environment for CI and the numbers in this README
+tests/                       # 99 offline pytest tests (11 modules); real-token smoke test included
+.github/workflows/           # CI: pytest (Python 3.11 + 3.13) + retention and retrieval floors
+inputs/                      # sample PDFs (a Springer textbook + a research paper)
+outputs/                     # cleaned .txt, report.json, retention.json, retrieval.json (gitignored)
+LICENSE                      # Apache-2.0
 ```
 
 ## Quickstart
 
 ```bash
-pip install -r requirements.txt
+pip install -e ".[app]"      # library + CLI + Streamlit UI; or: pip install -r requirements.txt
 ```
 
 > `tiktoken` downloads its tokenizer on first use, so the first run needs network access. The retention audit needs neither network nor `tiktoken`.
@@ -191,16 +195,18 @@ Run the test suite (offline — token counting is mocked; one opt-in test exerci
 
 ```bash
 pip install pytest
-python -m pytest tests -q   # 80 tests
+python -m pytest tests -q   # 99 tests
 ```
 
 ### CLI
 
 ```bash
-python main.py
+quantagen                                     # every PDF under ./inputs
+quantagen report.pdf papers/ --out build      # explicit inputs and output directory
+python -m quantagen --version                 # same entry point without the script
 ```
 
-Recursively scans `inputs/` for `*.pdf`, writes cleaned files to `outputs/`, and prints an audit report per document. Real numbers from the bundled samples:
+Scans files and directories recursively for `*.pdf`, writes cleaned text and the audit trail where `--out` points (default `outputs/`), and prints a report per document. Real numbers from the bundled samples:
 
 ```
 --- Audit Report: MLBasicsBook.pdf ---
@@ -236,7 +242,7 @@ Upload one or more PDFs, inspect the cleaned text per tab, and download the resu
 
 ### Configuration
 
-All tunables live in [`config.json`](config.json):
+All tunables live in [`config.json`](config.json). It resolves as `$QUANTAGEN_CONFIG` → `./config.json` → the copy packaged with the wheel, so a checkout's file wins when you run from the repo root and an installed CLI still works from any directory.
 
 | Key | Purpose |
 |---|---|
@@ -263,7 +269,7 @@ All tunables live in [`config.json`](config.json):
 6. **Section extraction is heuristic.** In books with per-chapter "Summary" headings, the extracted "conclusion" is the first such section's text, not the book's conclusion. Fine for papers, imperfect for books.
 7. **Detection is English-centric.** Non-Latin *text survives cleaning*, but the stop markers, section markers and noise patterns themselves target English/journal conventions.
 8. **Loss ledger entries are previews, not full text.** Each entry carries exact char/token accounting, but records at most a 160-char preview of the removed text — enough to eyeball *what* and *why* per span.
-9. **`process_document()` still catches broad exceptions** (it prints the full traceback). The pipeline itself (`clean_pipeline`) raises normally, and 93 offline tests + CI guard all documented behaviors.
+9. **`process_document()` still catches broad exceptions** (it prints the full traceback rather than raising to the caller). The pipeline itself (`clean_pipeline`) raises normally, the CLI exits non-zero when a document fails, and 99 offline tests + CI guard all documented behaviors.
 
 ## Fixed issues
 

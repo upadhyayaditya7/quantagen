@@ -1,4 +1,4 @@
-from rules.parser import extract_sections
+from quantagen.rules.parser import extract_sections
 
 
 def test_abstract_extracted_until_numbered_section():

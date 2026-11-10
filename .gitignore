@@ -4,6 +4,12 @@ venv/
 env/
 __pycache__/
 
+# Build artifacts (pip install -e ., python -m build)
+build/
+dist/
+*.egg-info/
+*.whl
+
 # IDE settings
 .vscode/
 .idea/

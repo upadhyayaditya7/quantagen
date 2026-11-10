@@ -1,6 +1,6 @@
 import streamlit as st
 import pandas as pd
-from main import (
+from quantagen.pipeline import (
     clean_pipeline, get_token_count,
     extract_text_from_stream, calc_efficiency
 )

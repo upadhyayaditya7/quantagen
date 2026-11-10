@@ -2,10 +2,28 @@ import re
 import json
 import os
 
-_CONFIG_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'config.json')
+# The packaged default ships with the wheel, so an installed CLI is
+# self-contained instead of looking for a config next to the caller.
+_PACKAGED_CONFIG = os.path.join(
+    os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'config.json')
+
+
+def config_path() -> str:
+    """Resolve the rules file: $QUANTAGEN_CONFIG, then ./config.json, then packaged.
+
+    A config in the working directory lets a project tune the rules without
+    editing site-packages, and keeps the checkout's config.json authoritative
+    when running from the repo root.
+    """
+    override = os.environ.get("QUANTAGEN_CONFIG")
+    if override:
+        return override
+    local = os.path.join(os.getcwd(), "config.json")
+    return local if os.path.isfile(local) else _PACKAGED_CONFIG
+
 
 def load_config():
-    with open(_CONFIG_PATH, 'r', encoding='utf-8') as f:
+    with open(config_path(), 'r', encoding='utf-8') as f:
         return json.load(f)
 
 def strip_recurring_noise(text, losses=None):

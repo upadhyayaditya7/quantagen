@@ -26,7 +26,7 @@ import statistics
 from collections import defaultdict
 from dataclasses import dataclass
 
-from rules import parser
+from . import parser
 
 # Fallback tunables; config.json ["layout"] overrides any of them.
 DEFAULT_LAYOUT = {
