@@ -44,6 +44,7 @@ The `quantagen` CLI (`quantagen/cli.py`) and `app.py` (UI) both call the same `l
 ## Features
 
 - **Layout-aware extraction** — PyMuPDF's per-page text is not reading order, so the raw stream is rebuilt: a recursive XY-cut reads two-column pages column by column and lifts running heads/footers out of the body, blocks keep their bounding boxes for margin analysis, hard-wrapped lines are rejoined, end-of-line hyphenation is repaired (`distri-` + `bution` → `distribution`), and paragraphs interrupted by a page break are stitched back together. On the bundled 288-page book this took the output from 9,018 hard-wrapped lines to 1,962 paragraphs, cutting mid-sentence line breaks from 3,692 to 39.
+- **Scanned-document detection, then OCR if it can** — before anything else, the document is checked for a text layer (`< 24` characters on a page counts as blank). An image-only PDF is never cleaned and written out as an empty file with a proud token-reduction number: with tesseract available it is OCR'd and the report says the raw baseline *is* the OCR text; without it the document is skipped loudly, recorded as `status: skipped`, and the CLI exits non-zero. Mixed documents keep their text pages.
 - **Page-furniture removal with attribution** — repeating margin lines (journal names, `Published By:` footers, running titles) and page numbers are dropped from the top/bottom bands using document frequency, not hand-written regexes, and each drop is ledgered with the page count that justified it. A line that is the *document title* once but a *running head* on later pages is kept where it is content and dropped where it is furniture.
 - **Retention audit** (`eval/retention.py`) — the pipeline is lossy, so it proves what it kept: numbers, capitalised entities and figure/table/citation references are extracted before and after cleaning, every loss is attributed to the stage that caused it, and hand-curated answer-bearing passages (18 across the two samples) are checked for survival. Deliberate scope decisions (front/back-matter trim, reference truncation) are reported with their measured cost instead of being silently excused. CI fails the build if retention drops below its floors.
 - **Retrieval-fidelity benchmark** (`eval/retrieval.py`) — survival is not the same as findable, so the same 18 curated questions are BM25-ranked over raw, post-layout and cleaned text (hit@1/3/5, MRR). Cleaning measures retrieval-neutral on both samples — the book's MRR is unchanged, the paper's improves — while the index shrinks 12.5% and 45%. CI fails if cleaning ever makes a document harder to search.
@@ -148,7 +149,7 @@ Quantagen's output is **34% smaller than pymupdf4llm's** on the book and **61% s
 What that comparison does *not* say, in fairness to the alternative:
 
 - pymupdf4llm emits **Markdown** with headings and tables. Some of its extra tokens are that structure, and structure this pipeline does not produce is a real feature — it is roadmap item 2, not a rounding error.
-- Its 100 s on the book is **OCR on 7 pages** (RapidOCR), which Quantagen does not do at all, so the runtime gap is not a pure extraction-speed comparison.
+- Its 100 s on the book is **OCR on 7 pages** (RapidOCR). Quantagen only OCRs a document that has no text layer, and the machine that produced these numbers has no tesseract installed, so its run skipped OCR entirely — the runtime gap is not a pure extraction-speed comparison.
 - Its output is larger than the raw stream (+24.9%); ours is smaller (−17.5%). Neither is automatically better — it depends on what is fed downstream.
 - **markitdown is not measured.** Its install pulls several hundred MB (magika/onnxruntime) and this machine had 113 MB free. Not measured is reported as not measured.
 - Both sides are scored on questions I authored, so treat the deltas as directional, not as a leaderboard.
@@ -176,7 +177,7 @@ eval/gold.json               # 18 curated answer-bearing passages (quoted from t
 config.json                  # the editable rules file for a checkout
 pyproject.toml               # packaging, console script, pinned dependencies
 requirements.txt             # pinned environment for CI and the numbers in this README
-tests/                       # 99 offline pytest tests (11 modules); real-token smoke test included
+tests/                       # 105 offline pytest tests (12 modules); real-token smoke test included
 .github/workflows/           # CI: pytest (Python 3.11 + 3.13) + retention and retrieval floors
 inputs/                      # sample PDFs (a Springer textbook + a research paper)
 outputs/                     # cleaned .txt, report.json, retention.json, retrieval.json (gitignored)
@@ -195,7 +196,7 @@ Run the test suite (offline — token counting is mocked; one opt-in test exerci
 
 ```bash
 pip install pytest
-python -m pytest tests -q   # 99 tests
+python -m pytest tests -q   # 105 tests
 ```
 
 ### CLI
@@ -231,6 +232,18 @@ Loss ledger:     24 spans removed (full trail in report.json)
 ```
 
 Note how different document types behave honestly differently: the textbook keeps most of its body (its savings come from front matter and layout noise), while the research paper legitimately drops ~40% to its reference section. An earlier version of this tool reported ~53% for *both* documents — that number was wrong (see [Fixed issues](#fixed-issues)).
+
+### Scanned PDFs
+
+```
+--- Skipped: scan.pdf ---
+No text layer on 2 of 2 page(s): this PDF is scanned images.
+OCR needs the tesseract binary on PATH (or TESSERACT_CMD).
+```
+
+OCR availability belongs to the machine, not the wheel, so the pipeline checks for it instead of assuming it: PyMuPDF drives the `tesseract` binary, `TESSERACT_CMD` overrides the lookup, and `OCR_DPI` (300) is the sampling density. When OCR runs, the audit prints it and `report.json` carries an `ocr` block naming the engine, page count and the fact that savings were measured against the OCR text rather than an empty text layer.
+
+Verified here with a stubbed engine plus a real no-text-layer PDF: detection, the skip path and the report are covered by tests. The tesseract call itself has **not** been exercised on this machine (no tesseract installed), so treat real OCR output quality as untested until you run it against a scan you know.
 
 ### Streamlit UI
 
@@ -269,7 +282,8 @@ All tunables live in [`config.json`](config.json). It resolves as `$QUANTAGEN_CO
 6. **Section extraction is heuristic.** In books with per-chapter "Summary" headings, the extracted "conclusion" is the first such section's text, not the book's conclusion. Fine for papers, imperfect for books.
 7. **Detection is English-centric.** Non-Latin *text survives cleaning*, but the stop markers, section markers and noise patterns themselves target English/journal conventions.
 8. **Loss ledger entries are previews, not full text.** Each entry carries exact char/token accounting, but records at most a 160-char preview of the removed text — enough to eyeball *what* and *why* per span.
-9. **`process_document()` still catches broad exceptions** (it prints the full traceback rather than raising to the caller). The pipeline itself (`clean_pipeline`) raises normally, the CLI exits non-zero when a document fails, and 99 offline tests + CI guard all documented behaviors.
+9. **`process_document()` still catches broad exceptions** (it prints the full traceback rather than raising to the caller). The pipeline itself (`clean_pipeline`) raises normally, the CLI exits non-zero when a document fails, and 105 offline tests + CI guard all documented behaviors.
+10. **Image-only detection is per document, not per page.** A text PDF with a few scanned pages keeps its text pages and silently drops the scanned ones. Whole-document OCR is implemented; per-page fallback inside the layout pass is not, and it needs OCR text to be woven into reading order rather than appended.
 
 ## Fixed issues
 
@@ -289,7 +303,8 @@ For the record — these shipped broken and were fixed after being reproduced ag
 1. **Model-based answer accuracy** — survival and findability are now both measured (retention audit + BM25 retrieval fidelity). What remains is scoring generated answers against the raw-text answers, which needs an API key and a judge, so it cannot gate CI; it belongs in a separate, clearly labelled harness.
 2. **Markdown re-emission** — paragraphs now survive extraction, so headings/lists/tables can be emitted as Markdown, improving downstream RAG retrieval.
 3. **Content-aware front/back-matter detection** — TOC and colophon detection to retire the blunt `structural_rules` percent trim, whose measured cost is now visible (49 numbers and 51 entities on a 6-page paper).
-4. **Packaging** — `pyproject.toml`, `pip install quantagen`, a proper `quantagen` CLI entry point, and fixture PDFs in the test suite.
+4. **Mixed-document OCR** — image-only PDFs are handled; scanned pages *inside* a text PDF still vanish, because OCR text has to be placed into reading order rather than appended. Per-page fallback is the next robustness step, and it is only worth building against a real tesseract install to measure against.
+5. **Independent evaluation corpus** — the 18 questions were written by the same person who wrote the pipeline. Ten to twenty PDFs from varied sources, reported as ranges instead of two curated samples, would make the retention floors evidence rather than self-assessment.
 
 ## License
 

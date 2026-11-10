@@ -9,6 +9,7 @@ trail in outputs/report.json trustworthy rather than decorative.
 
 import os
 import json
+import shutil
 from datetime import datetime, timezone
 
 import fitz
@@ -152,6 +153,63 @@ def sieve_text(raw_text):
     """Backwards-compatible alias for clean_pipeline()."""
     return clean_pipeline(raw_text)
 
+
+# A page with fewer extractable characters than this has no usable text layer:
+# a scanned image page yields 0, a real text page yields words.
+MIN_PAGE_CHARS = 24
+
+# Below this total, a document is image-only even if a scan left a few stray
+# characters behind (a stamped bates number, a speck of embedded text).
+MIN_DOCUMENT_CHARS = 200
+
+OCR_DPI = 300
+
+
+def blank_pages(doc, min_chars: int = MIN_PAGE_CHARS) -> list:
+    """Zero-based indexes of pages whose text layer is empty or unusable."""
+    return [index for index, page in enumerate(doc)
+            if len(page.get_text().strip()) < min_chars]
+
+
+def needs_ocr(doc, min_chars: int = MIN_PAGE_CHARS,
+              min_document_chars: int = MIN_DOCUMENT_CHARS) -> bool:
+    """True when the PDF is image-only, so text extraction cannot work at all.
+
+    Detecting this matters more than the OCR itself: without it the pipeline
+    writes an empty .txt and reports a token reduction, which reads as success
+    when the document was simply never readable.
+    """
+    if doc.page_count == 0:
+        return False
+    blank = blank_pages(doc, min_chars)
+    if len(blank) == doc.page_count:
+        return True
+    total = sum(len(page.get_text().strip()) for page in doc)
+    return total < min_document_chars and len(blank) > doc.page_count // 2
+
+
+def ocr_engine() -> str | None:
+    """'tesseract' when PyMuPDF can drive OCR on this machine, else None.
+
+    PyMuPDF shells out to the tesseract binary, so OCR availability is a
+    property of the machine rather than of the wheel. TESSERACT_CMD overrides
+    the PATH lookup for installations elsewhere.
+    """
+    if not hasattr(fitz.Page, "get_textpage_ocr"):
+        return None
+    executable = os.environ.get("TESSERACT_CMD") or shutil.which("tesseract")
+    return "tesseract" if executable else None
+
+
+def ocr_text(doc, language: str = "eng", dpi: int = OCR_DPI) -> str:
+    """OCR every page in page order. Call only when ocr_engine() is not None."""
+    pages = []
+    for page in doc:
+        textpage = page.get_textpage_ocr(language=language, dpi=dpi, full=True)
+        pages.append(page.get_text(textpage=textpage))
+    return "\n".join(pages)
+
+
 def process_document(file_path: str, output_folder: str = "outputs"):
     """Extract, clean and audit one PDF; returns (cleaned_text, sections).
 
@@ -163,15 +221,44 @@ def process_document(file_path: str, output_folder: str = "outputs"):
     os.makedirs(output_folder, exist_ok=True)
     
     try:
-        # 1. Extract raw text (naive per-page stream: the honest raw baseline)
         doc = fitz.open(file_path)
-        raw_text = "\n".join([page.get_text() for page in doc])
+
+        # 0. Image-only documents: refuse to write an empty file and call it a
+        #    win. OCR when the machine can, skip loudly when it cannot.
+        ocr_info = None
+        if needs_ocr(doc):
+            engine = ocr_engine()
+            blank = blank_pages(doc)
+            if engine is None:
+                print(f"\n--- Skipped: {file_name} ---")
+                print(f"No text layer on {len(blank)} of {doc.page_count} page(s): "
+                      "this PDF is scanned images.")
+                print("OCR needs the tesseract binary on PATH (or TESSERACT_CMD). "
+                      "Install it, or supply a PDF with a text layer. "
+                      "No output written.")
+                DOCUMENT_REPORTS.append({
+                    "document": file_name,
+                    "category": category,
+                    "status": "skipped",
+                    "reason": "scanned PDF with no text layer; OCR engine unavailable",
+                    "pages": doc.page_count,
+                    "blank_pages": len(blank),
+                })
+                return None, None
+            ocr_info = {"engine": engine, "pages": doc.page_count, "dpi": OCR_DPI,
+                        "language": "eng", "baseline": "ocr text"}
+
+        # 1. Extract raw text (naive per-page stream: the honest raw baseline).
+        #    For a scanned document the OCR output *is* the raw text: measuring
+        #    savings against an empty text layer would be meaningless.
+        raw_text = ocr_text(doc) if ocr_info else "\n".join(page.get_text() for page in doc)
         raw_token_count = get_token_count(raw_text)
 
-        # 2. Layout extraction: reading order, margin furniture, paragraph reflow
+        # 2. Layout extraction: reading order, margin furniture, paragraph reflow.
+        #    Layout reconstruction needs text blocks, which OCR pages do not have.
         stage_tokens = {}
         losses = []
-        extracted = layout.extract_text(doc, losses)
+        extracted = raw_text if ocr_info else layout.extract_text(doc, losses)
         stage_tokens["layout extraction"] = max(0, raw_token_count - get_token_count(extracted))
 
         # 3. Process (single canonical pipeline, same as the UI)
@@ -195,6 +282,8 @@ def process_document(file_path: str, output_folder: str = "outputs"):
             "sections": sections,
             "losses": losses,
         }
+        if ocr_info:
+            document_report["ocr"] = ocr_info
         DOCUMENT_REPORTS.append(document_report)
         
         # 6. Save final result
@@ -206,6 +295,9 @@ def process_document(file_path: str, output_folder: str = "outputs"):
         
         # 7. Audit Report
         print(f"\n--- Audit Report: {file_name} ---")
+        if ocr_info:
+            print(f"OCR:             {ocr_info['engine']} on all {ocr_info['pages']} page(s); "
+                  "raw baseline is the OCR text")
         print(f"Raw Tokens:      {raw_token_count}")
         print(f"Cleaned Tokens:  {clean_token_count}")
         print(f"Efficiency:      {reduction_pct:.4f}% ({saved_tokens} tokens removed)")
@@ -244,7 +336,15 @@ def write_report(path="outputs/report.json"):
 
 
 def extract_text_from_stream(file_stream):
+    """Layout text for the UI; OCRs image-only PDFs or says why it cannot."""
     doc = fitz.open(stream=file_stream.read(), filetype="pdf")
+    if needs_ocr(doc):
+        if ocr_engine() is None:
+            raise RuntimeError(
+                "This PDF has no text layer (scanned images) and OCR needs the "
+                "tesseract binary on PATH (or TESSERACT_CMD)."
+            )
+        return ocr_text(doc)
     return layout.extract_text(doc)
 
 def calc_efficiency(raw_text, clean_text):
