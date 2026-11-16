@@ -58,6 +58,7 @@ def filter_noise(text: str, losses=None) -> str:
                     "reason": "page-number-like line",
                     "removed": stripped[:160],
                     "chars": len(stripped),
+                    "_full": stripped,
                 })
             continue
             
@@ -71,6 +72,7 @@ def filter_noise(text: str, losses=None) -> str:
                     "reason": "symbol-dense line (>50% non-letter characters)",
                     "removed": stripped[:160],
                     "chars": len(stripped),
+                    "_full": stripped,
                 })
             continue
             
@@ -114,6 +116,7 @@ def trim_structural_edges(text: str, losses=None) -> str:
                     "reason": label,
                     "removed": part[:160],
                     "chars": len(part),
+                    "_full": part,
                 })
     return text[start:end]
 
@@ -146,7 +149,13 @@ def clean_pipeline(raw_text: str, stage_tokens: dict | None = None,
     if losses is not None:
         for entry in losses:
             if "tokens" not in entry:
-                entry["tokens"] = get_token_count(entry["removed"])
+                # Count the span that was actually removed. `removed` is a
+                # <=160-char preview, so tokenizing it reported 45 tokens for
+                # the book's 8,671-token head trim and left report.json
+                # contradicting its own stage_tokens summary (100 vs 18,526).
+                span = entry.pop("_full", None)
+                entry["tokens"] = get_token_count(
+                    entry["removed"] if span is None else span)
     return text
 
 def sieve_text(raw_text):
