@@ -72,6 +72,43 @@ def test_ledger_entries_carry_tokens_and_chars():
         assert e["tokens"] >= 0
         assert isinstance(e["chars"], int)
         assert len(e["removed"]) <= 160
+        # The full-span carrier is internal: it must never reach report.json.
+        assert "_full" not in e
+
+
+def test_ledger_tokens_account_for_the_whole_span_not_its_preview(monkeypatch):
+    # Regression: every entry tokenized its own <=160-char preview, so the
+    # book's 18,526-token head+tail trim was ledgered as 100 tokens and
+    # report.json contradicted its own stage_tokens summary by 185x. A lexical
+    # test (`isinstance(tokens, int)`) is what let that ship; this one checks
+    # that the ledger reconciles with the per-stage audit it sits next to.
+    cfg = dict(pipeline.load_config())
+    cfg["structural_rules"] = {"strip_top_n_percent": 0.1, "strip_bottom_n_percent": 0.1}
+    monkeypatch.setattr(pipeline, "load_config", lambda: cfg)
+
+    body = "\n".join(f"Body line {i} carries real words and a value {i}." for i in range(300))
+    text = body + "\nREFERENCES\n" + "[1] citation entry.\n" * 150
+
+    losses, stages = [], {}
+    clean_pipeline(text, stages, losses)
+
+    ledgered = {}
+    for entry in losses:
+        ledgered[entry["stage"]] = ledgered.get(entry["stage"], 0) + entry["tokens"]
+        assert "_full" not in entry
+
+    # Trim and truncation each remove one or two spans, so their ledger sum has
+    # to match the stage summary (token boundaries at a span edge may shift it
+    # by a token or two, hence the small tolerance).
+    for stage in ("structural trim", "stop-marker truncation"):
+        assert stages[stage] > 0
+        assert abs(ledgered[stage] - stages[stage]) <= 2, (
+            stage, ledgered[stage], stages[stage])
+
+    # No removed span may be accounted for at the price of its preview.
+    for entry in losses:
+        if entry["chars"] > 200:
+            assert entry["tokens"] >= entry["chars"] / 8
 
 
 def test_clean_text_never_reappears_lossless_sum_notice():

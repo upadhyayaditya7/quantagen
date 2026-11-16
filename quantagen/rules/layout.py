@@ -465,6 +465,7 @@ def extract_text(doc, losses=None, cfg=None) -> str:
                     "reason": reason,
                     "removed": block.text[:160],
                     "chars": len(block.text),
+                    "_full": block.text,
                 })
         for block in order_blocks(kept, cfg):
             heading = is_heading(block, body_size, cfg)

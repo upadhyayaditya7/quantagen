@@ -1,7 +1,9 @@
 {
   "structural_rules": {
-    "strip_top_n_percent": 0.05,
-    "strip_bottom_n_percent": 0.05
+    "mode": "detect",
+    "strip_top_n_percent": 0.0,
+    "strip_bottom_n_percent": 0.0,
+    "max_front_matter_pct": 0.15
   },
   "layout": {
     "top_band_pct": 0.08,

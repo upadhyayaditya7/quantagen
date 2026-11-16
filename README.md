@@ -20,7 +20,8 @@ layout.extract_text()           ← reading order via recursive XY-cut (columns,
    │  margin furniture dropped · hard wraps joined · words de-hyphenated
    │  paragraphs stitched across page breaks (quantagen/rules/layout.py)
    ▼
-trim_structural_edges()         ← config-driven % trim of document head/tail (pipeline.py)
+trim_structural_edges()         ← front-matter detection: title block, table of contents
+   │                               (pipeline.py; a % trim is still available, off by default)
    │
    ▼
 filter_noise()                  ← Unicode-aware line-level filter (pipeline.py)
@@ -47,7 +48,7 @@ The `quantagen` CLI (`quantagen/cli.py`) and `app.py` (UI) both call the same `l
 - **Scanned-document detection, then OCR if it can** — before anything else, the document is checked for a text layer (`< 24` characters on a page counts as blank). An image-only PDF is never cleaned and written out as an empty file with a proud token-reduction number: with tesseract available it is OCR'd and the report says the raw baseline *is* the OCR text; without it the document is skipped loudly, recorded as `status: skipped`, and the CLI exits non-zero. Mixed documents keep their text pages.
 - **Page-furniture removal with attribution** — repeating margin lines (journal names, `Published By:` footers, running titles) and page numbers are dropped from the top/bottom bands using document frequency, not hand-written regexes, and each drop is ledgered with the page count that justified it. A line that is the *document title* once but a *running head* on later pages is kept where it is content and dropped where it is furniture.
 - **Retention audit** (`eval/retention.py`) — the pipeline is lossy, so it proves what it kept: numbers, capitalised entities and figure/table/citation references are extracted before and after cleaning, every loss is attributed to the stage that caused it, and hand-curated answer-bearing passages (18 across the two samples) are checked for survival. Deliberate scope decisions (front/back-matter trim, reference truncation) are reported with their measured cost instead of being silently excused. CI fails the build if retention drops below its floors.
-- **Retrieval-fidelity benchmark** (`eval/retrieval.py`) — survival is not the same as findable, so the same 18 curated questions are BM25-ranked over raw, post-layout and cleaned text (hit@1/3/5, MRR). Cleaning measures retrieval-neutral on both samples — the book's MRR is unchanged, the paper's improves — while the index shrinks 12.5% and 45%. CI fails if cleaning ever makes a document harder to search.
+- **Retrieval-fidelity benchmark** (`eval/retrieval.py`) — survival is not the same as findable, so the same 18 curated questions are BM25-ranked over raw, post-layout and cleaned text (hit@1/3/5, MRR). All 18 curated answers stay in the top 3 in every variant, the paper's MRR improves, and the index shrinks 10.2% and 38.8%; scores are averaged over three window alignments so chunk boundaries cannot decide the result. CI fails if cleaning loses an answer the raw text found.
 - **Head-to-head comparison** (`eval/compare.py`) — another extractor's output is scored on the same questions and metrics. Measured against `pymupdf4llm` 2.1: 34% fewer tokens on the book (17.5% below raw, versus 24.9% *above* raw), one more curated answer retained, and better MRR on both samples — with the unfair parts of that comparison written down rather than omitted.
 - **Installable console script** — `pip install -e .` puts a `quantagen` command on PATH: `quantagen` scans `./inputs`, `quantagen report.pdf papers/ --out build` takes explicit files and directories and writes cleaned text plus the audit trail wherever you point it. The same entry point runs without the script via `python -m quantagen`.
 - **Streamlit UI** (`app.py`) — multi-file upload, one tab per document with raw/cleaned token metrics, a 600px preview pane, per-file `.txt` download, and a batch summary table.
@@ -63,12 +64,12 @@ Same two PDFs, naive per-page extraction versus the layout-aware path (both then
 
 | | MLBasicsBook.pdf (288 pp) | researchpaperOnSustainableDev.pdf (6 pp) |
 |---|---|---|
-| Cleaned tokens | 130,281 → **127,878** | 3,762 → **3,120** |
-| Reduction vs. raw | 15.98% → **17.53%** | 55.95% → **63.47%** |
+| Cleaned tokens | 138,657 → **131,177** | 4,106 → **3,434** |
+| Reduction vs. raw | 10.58% → **15.40%** | 51.92% → **59.79%** |
 | End-of-line hyphen splits | 239 → **1** | 0 → **0** |
 | Paragraphs split mid-sentence | 3,692 → **39** | 195 → **0** |
 | Page furniture occurrences | 0 → **0** | 11 → **0** |
-| Output units | 9,018 lines → **1,962 paragraphs** | 334 lines → **50 paragraphs** |
+| Output units | 9,628 lines → **1,978 paragraphs** | 365 lines → **53 paragraphs** |
 
 The token win is modest on the book (furniture was already largely caught by regexes there), but the *readability* win is large: the cleaned output is now paragraphs, not fractured column interleavings. On the journal paper the win is direct — 1,280 tokens of repeating journal footers and running titles are gone at the extraction level, before any regex runs.
 
@@ -77,7 +78,7 @@ The token win is modest on the book (furniture was already largely caught by reg
 Token savings say nothing about what was thrown away, so `eval/retention.py` measures the other side. Definitions (all deterministic and offline — no labels, no model calls, no tokenizer):
 
 - **base** — text after layout extraction, before any cleaning stage.
-- **scope** — what the documented scope decisions removed (front/back-matter percent trim, reference truncation). Reported with counts and examples, never silently excused.
+- **scope** — what the documented scope decisions removed (front matter, reference/index truncation). Reported with counts and examples, never silently excused.
 - **gold** — `base` minus `scope`: the content the pipeline promised to keep.
 - **retention** — retained / gold. This is the number worth quoting next to the token reduction.
 
@@ -87,12 +88,12 @@ The figures below were measured with **PyMuPDF 1.27.2.3**, which `requirements.t
 
 | | MLBasicsBook.pdf | researchpaperOnSustainableDev.pdf |
 |---|---|---|
-| Numbers retained | 6,058 / 6,226 → **97.30%** | 64 / 64 → **100.00%** |
-| Entities retained | 496 / 496 → **100.00%** | 191 / 191 → **100.00%** |
+| Numbers retained | 6,326 / 6,494 → **97.41%** | 69 / 69 → **100.00%** |
+| Entities retained | 498 / 498 → **100.00%** | 194 / 194 → **100.00%** |
 | Figure/table/citation refs | 113 / 113 → **100.00%** | 1 / 1 → **100.00%** |
 | Curated answer passages | 10 / 10 → **100%** | 8 / 8 → **100%** |
-| Removed by design (trim) | 1,298 numbers, 665 entities | 49 numbers, 51 entities |
-| Removed by design (references) | — | 262 numbers, 437 entities |
+| Removed by design (front matter) | 278 numbers, 57 entities | — |
+| Removed by design (references, index) | 752 numbers, 606 entities | 306 numbers, 485 entities |
 
 The only unintended number loss is **168 bare numerals in the book**: chart tick labels (`1 1 1` then `2 3 4 5 6 7 Time` inside a figure) that the line filter cannot distinguish from page numbers. The audit reports them rather than excluding them, which is why the book's gate is 97% and not 100%. Everything else the audit found was fixed (see [Fixed issues](#fixed-issues)).
 
@@ -109,19 +110,19 @@ Retention proves the content survived; it cannot prove a retriever would surface
 
 | MLBasicsBook.pdf | raw | post-layout | cleaned |
 |---|---|---|---|
-| Chunks indexed | 1,085 | 1,085 | 949 |
-| hit@1 / hit@3 / hit@5 | 90.0% / 90.0% / 100% | 80.0% / 100.0% / 100% | 90.0% / 90.0% / 100% |
-| MRR | 0.925 | 0.883 | 0.925 |
+| Chunks indexed | 1,085 | 1,085 | 974 |
+| hit@1 / hit@3 / hit@5 | 90.0% / 100% / 100% | 90.0% / 100% / 100% | 90.0% / 100% / 100% |
+| MRR | 0.911 | 0.894 | 0.884 |
 
 | researchpaperOnSustainableDev.pdf | raw | post-layout | cleaned |
 |---|---|---|---|
-| Chunks indexed | 49 | 47 | 27 |
-| hit@1 / hit@3 / hit@5 | 87.5% / 100% / 100% | 75.0% / 100% / 100% | 87.5% / 100% / 100% |
-| MRR | 0.917 | 0.854 | 0.938 |
+| Chunks indexed | 49 | 47 | 30 |
+| hit@1 / hit@3 / hit@5 | 87.5% / 100% / 100% | 87.5% / 100% / 100% | 87.5% / 100% / 100% |
+| MRR | 0.903 | 0.889 | 0.931 |
 
-Cleaning is retrieval-neutral, not retrieval-damaging: the book keeps an identical MRR (0.925) and the paper improves slightly (0.917 → 0.938), while the index shrinks by 12.5% and 45% respectively. That is the claim worth making — every removed token was index space that bought nothing. One book question lands at rank 4 in both raw and cleaned text; the retention section above is where the costs of cleaning are disclosed. CI fails if cleaned hit@3 falls below 80% or cleaned MRR falls more than 0.01 below raw.
+Cleaning is retrieval-neutral, not retrieval-damaging: **all 18 curated answers land in the top 3 in every variant**, the paper's MRR improves (0.903 → 0.931), and the index shrinks by 10.2% and 38.8%. The book's MRR sits 0.027 lower (0.911 → 0.884) because two of ten questions slip a single rank while one gains one — every answer is still in the top 3, and the retention section above is where the costs of cleaning are disclosed. CI fails if cleaned hit@3 falls below 80%, if it falls below the raw text's hit@3, or if MRR falls more than 0.05 below raw (one question moving one rank on a ten-question set is 0.05, so a tighter gate measures the chunker's luck rather than the text).
 
-Honest limits: BM25 is a lexical baseline, not a neural retriever, so this measures findability by the question's own words; 18 questions is a small sample; the chunk size is one common RAG default (a different size moves every score); and the bundled book is effectively single-column, so these numbers do not exercise layout's column-order fix — the paper's do.
+Honest limits: BM25 is a lexical baseline, not a neural retriever, so this measures findability by the question's own words; 18 questions is a small sample; the chunk size is one common RAG default (a different size moves every score); and the bundled book is effectively single-column, so these numbers do not exercise layout's column-order fix — the paper's do. Every score is the mean of three staggered window alignments (`CHUNK_OFFSETS`), because a single alignment is luck: on the book the same answer sentence ranks 3rd or 6th on bit-identical text depending only on where the 120-word window starts.
 
 ```bash
 python eval/retrieval.py           # audit inputs/, write outputs/retrieval.json
@@ -138,13 +139,15 @@ Numbers only persuade next to a baseline, so `eval/compare.py` puts another extr
 | **Quantagen** | **127,878** | **−17.5%** | **10/10** | **90.0%** | **0.925** | **1.9 s** |
 | pymupdf4llm 2.1 | 193,676 | +24.9% | 9/10 | 90.0% | 0.833 | 100 s |
 
+> **Both tables were measured on the previous build** (5% head/tail trim). Quantagen's own rows are now 131,177 tokens (−15.4%, MRR 0.884) on the book and 3,434 (−59.8%, MRR 0.931) on the paper, and the retrieval columns are now averaged over three window alignments, so the other tools' rows are not directly comparable until `eval/compare.py` is re-run. The numbers below are kept as the record of what was measured, not as a current claim.
+
 | researchpaperOnSustainableDev.pdf (6 pp, 8 questions) | tokens | vs raw | answer spans | hit@3 | MRR | wall clock |
 |---|---|---|---|---|---|---|
 | Raw PyMuPDF stream | 8,540 | — | 8/8 | 100% | 0.917 | — |
 | **Quantagen** | **3,120** | **−63.5%** | **8/8** | **100%** | **0.938** | **0.1 s** |
 | pymupdf4llm 2.1 | 7,960 | −6.8% | 8/8 | 100% | 0.854 | 10 s |
 
-Quantagen's output is **34% smaller than pymupdf4llm's** on the book and **61% smaller** on the paper; it keeps every curated answer, where pymupdf4llm loses one (Equation 4.20 — its surrounding sentence survives only 44% of its 5-word shingles), and it ranks better on both documents.
+On that build, Quantagen's output was **34% smaller than pymupdf4llm's** on the book and **61% smaller** on the paper; it kept every curated answer, where pymupdf4llm lost one (Equation 4.20 — its surrounding sentence survives only 44% of its 5-word shingles), and it ranked better on both documents.
 
 What that comparison does *not* say, in fairness to the alternative:
 
@@ -177,7 +180,7 @@ eval/gold.json               # 18 curated answer-bearing passages (quoted from t
 config.json                  # the editable rules file for a checkout
 pyproject.toml               # packaging, console script, pinned dependencies
 requirements.txt             # pinned environment for CI and the numbers in this README
-tests/                       # 105 offline pytest tests (12 modules); real-token smoke test included
+tests/                       # 118 offline pytest tests (13 modules); real-token smoke test included
 .github/workflows/           # CI: pytest (Python 3.11 + 3.13) + retention and retrieval floors
 inputs/                      # sample PDFs (a Springer textbook + a research paper)
 outputs/                     # cleaned .txt, report.json, retention.json, retrieval.json (gitignored)
@@ -196,7 +199,7 @@ Run the test suite (offline — token counting is mocked; one opt-in test exerci
 
 ```bash
 pip install pytest
-python -m pytest tests -q   # 105 tests
+python -m pytest tests -q   # 118 tests
 ```
 
 ### CLI
@@ -212,26 +215,27 @@ Scans files and directories recursively for `*.pdf`, writes cleaned text and the
 ```
 --- Audit Report: MLBasicsBook.pdf ---
 Raw Tokens:      155055
-Cleaned Tokens:  127878
-Efficiency:      17.5273% (27177 tokens removed)
+Cleaned Tokens:  131177
+Efficiency:      15.3997% (23878 tokens removed)
   - layout extraction            7357 tokens
-  - structural trim             18526 tokens
+  - structural trim              7447 tokens
   - line filter                  1294 tokens
+  - stop-marker truncation       7780 tokens
 Sections:        abstract (1421 chars), conclusion (3346 chars)
 Loss ledger:     493 spans removed (full trail in report.json)
 
 --- Audit Report: researchpaperOnSustainableDev.pdf ---
 Raw Tokens:      8540
-Cleaned Tokens:  3120
-Efficiency:      63.4660% (5420 tokens removed)
+Cleaned Tokens:  3434
+Efficiency:      59.7892% (5106 tokens removed)
   - layout extraction            1280 tokens
-  - structural trim               820 tokens
-  - stop-marker truncation       3320 tokens
-Sections:        conclusion (960 chars)
-Loss ledger:     24 spans removed (full trail in report.json)
+  - structural trim                19 tokens
+  - stop-marker truncation       3807 tokens
+Sections:        abstract (768 chars), conclusion (960 chars)
+Loss ledger:     23 spans removed (full trail in report.json)
 ```
 
-Note how different document types behave honestly differently: the textbook keeps most of its body (its savings come from front matter and layout noise), while the research paper legitimately drops ~40% to its reference section. An earlier version of this tool reported ~53% for *both* documents — that number was wrong (see [Fixed issues](#fixed-issues)).
+Note how different document types behave honestly differently: the textbook keeps its body and loses front matter, its index and its glossary headings to detected structure, while the research paper legitimately drops ~40% to its reference section and now keeps its abstract (the old percent trim used to cut the start of it). An earlier version of this tool reported ~53% for *both* documents — that number was wrong (see [Fixed issues](#fixed-issues)).
 
 ### Scanned PDFs
 
@@ -259,7 +263,9 @@ All tunables live in [`config.json`](config.json). It resolves as `$QUANTAGEN_CO
 
 | Key | Purpose |
 |---|---|
-| `structural_rules` | Fraction of the top/bottom of the document to strip (0–1). Set to `0` to disable. Boundaries snap to line starts, so trimming never emits a partial word. |
+| `structural_rules.mode` | `detect` (default) removes front matter only where the document shows a table of contents or a title block; `percent` restores the old unconditional top/bottom trim. Detection is capped so it can never eat more than `max_front_matter_pct` of the text. |
+| `structural_rules.max_front_matter_pct` | Largest share of the document detection may remove (default `0.15`), with a 200-character floor so a one-page paper's two-line title block still qualifies. |
+| `structural_rules.strip_top_n_percent` / `strip_bottom_n_percent` | The percentage trim, now `0` by default and only used when `mode` is `percent`. Boundaries snap to line starts, so trimming never emits a partial word. |
 | `layout.top_band_pct` / `layout.bottom_band_pct` | Share of page height treated as running-head / footer margin (default `0.08`). |
 | `layout.page_number_band_pct` | Wider band in which a bare number is treated as a page number (default `0.15`). |
 | `layout.furniture_min_pages` / `layout.furniture_page_ratio` | Evidence required before a margin line counts as furniture (default ≥ 3 pages and ≥ 50% of pages). |
@@ -277,12 +283,12 @@ All tunables live in [`config.json`](config.json). It resolves as `$QUANTAGEN_CO
 1. **Retention is a proxy for quality, not a measurement of it.** Numbers, entities, figure references and 18 curated passages are checked for survival; retrieval fidelity (`eval/retrieval.py`) then checks the passages are still findable, but nothing yet measures whether *answers computed* from the cleaned text match answers from the raw text. Treat retention as a floor, not a certificate.
 2. **Reading order is a heuristic, not a layout model.** The XY-cut needs a genuinely empty gutter to split columns, and it separates structural rows before columns. Table- or figure-like regions whose whitespace aligns are therefore read row-wise, and a multi-column page with an irregular gutter can fall back to top-to-bottom order. It fixes the common cases (papers, books); it is not a document-AI model.
 3. **Reflow is heuristic.** An end-of-line hyphen is only removed when the next line starts lowercase, so compound words split at a line break stay hyphenated. Paragraph stitching needs a long previous line and a lowercase continuation, so some page breaks remain visible (39 in the bundled book).
-4. **`structural_rules` is still a blunt instrument.** Trimming 5% off each end is right for documents with cover pages/colophons and wrong for documents without them: on the 6-page paper it also removes the title block and the start of the abstract (measured: 49 numbers and 51 entities). Margin-furniture detection now handles running heads and footers, but tables of contents and colophons are still the percent trim's job.
-5. **Bare numerals are still dropped.** The line filter cannot tell a chart tick label from a stray page number, so figure axis numbers (`1`, `2`, `3` …) are lost: 168 of 6,226 numbers in the book, which is why its retention floor is 97%.
+4. **Front-matter detection needs an anchor.** A table of contents (three or more dot-leader lines) or a title block followed by a real paragraph is what licenses a cut; a cover page with no TOC and no prose behind it, an epigraph, or a document that begins with a figure keeps its front matter. That is deliberate — the alternative was a percentage, which was measured removing the start of the paper's abstract — but it means detection is a floor, not a guarantee.
+5. **Bare numerals are still dropped.** The line filter cannot tell a chart tick label from a stray page number, so figure axis numbers (`1`, `2`, `3` …) are lost: 168 of 6,494 numbers in the book, which is why its retention floor is 97%.
 6. **Section extraction is heuristic.** In books with per-chapter "Summary" headings, the extracted "conclusion" is the first such section's text, not the book's conclusion. Fine for papers, imperfect for books.
 7. **Detection is English-centric.** Non-Latin *text survives cleaning*, but the stop markers, section markers and noise patterns themselves target English/journal conventions.
 8. **Loss ledger entries are previews, not full text.** Each entry carries exact char/token accounting, but records at most a 160-char preview of the removed text — enough to eyeball *what* and *why* per span.
-9. **`process_document()` still catches broad exceptions** (it prints the full traceback rather than raising to the caller). The pipeline itself (`clean_pipeline`) raises normally, the CLI exits non-zero when a document fails, and 105 offline tests + CI guard all documented behaviors.
+9. **`process_document()` still catches broad exceptions** (it prints the full traceback rather than raising to the caller). The pipeline itself (`clean_pipeline`) raises normally, the CLI exits non-zero when a document fails, and 118 offline tests + CI guard all documented behaviors.
 10. **Image-only detection is per document, not per page.** A text PDF with a few scanned pages keeps its text pages and silently drops the scanned ones. Whole-document OCR is implemented; per-page fallback inside the layout pass is not, and it needs OCR text to be woven into reading order rather than appended.
 
 ## Fixed issues
@@ -297,12 +303,13 @@ For the record — these shipped broken and were fixed after being reproduced ag
 - **Non-Latin text was deleted wholesale:** the density filter counted only `[a-zA-Z\d\s]` as content, so Japanese/Cyrillic/Arabic lines scored as ~100% symbols. The filter is now Unicode-aware while still dropping symbol-dense layout lines.
 - **CLI and UI ran different pipelines:** the UI skipped `filter_noise()`. Both now share one `clean_pipeline()` (and one extraction path).
 - **`structural_rules` was dead config** and **extracted sections were computed but discarded**: both are wired up and surfaced in the CLI audit.
+- **The percent trim destroyed content on short documents:** `strip_top_n_percent: 0.05` was 5% of the whole text, so on the 6-page paper it cut the title block and the start of the abstract (49 numbers, 51 entities), and on a three-row table it took the first and last rows. Front matter is now detected from a table of contents or a title block, capped, and ledgered with the evidence that licensed the cut; the percentage path remains as an explicit opt-in.
 
 ## Roadmap
 
 1. **Model-based answer accuracy** — survival and findability are now both measured (retention audit + BM25 retrieval fidelity). What remains is scoring generated answers against the raw-text answers, which needs an API key and a judge, so it cannot gate CI; it belongs in a separate, clearly labelled harness.
 2. **Markdown re-emission** — paragraphs now survive extraction, so headings/lists/tables can be emitted as Markdown, improving downstream RAG retrieval.
-3. **Content-aware front/back-matter detection** — TOC and colophon detection to retire the blunt `structural_rules` percent trim, whose measured cost is now visible (49 numbers and 51 entities on a 6-page paper).
+3. **Widen front-matter detection** — TOC and title-block detection replaced the percent trim; colophons, epigraphs and figure-first openings still survive. Back matter is handled only where a stop-marker heading exists.
 4. **Mixed-document OCR** — image-only PDFs are handled; scanned pages *inside* a text PDF still vanish, because OCR text has to be placed into reading order rather than appended. Per-page fallback is the next robustness step, and it is only worth building against a real tesseract install to measure against.
 5. **Independent evaluation corpus** — the 18 questions were written by the same person who wrote the pipeline. Ten to twenty PDFs from varied sources, reported as ranges instead of two curated samples, would make the retention floors evidence rather than self-assessment.
 

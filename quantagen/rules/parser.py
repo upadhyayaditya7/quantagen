@@ -39,6 +39,7 @@ def strip_recurring_noise(text, losses=None):
                     "reason": f"matched configured pattern {pattern}",
                     "removed": line[:160],
                     "chars": len(line),
+                    "_full": line,
                 })
     return text
 
@@ -81,6 +82,7 @@ def truncate_at_stop_markers(text, losses=None):
                 "reason": f"truncated at standalone heading {removed.splitlines()[0]!r}",
                 "removed": removed[-160:],
                 "chars": len(removed),
+                "_full": removed,
             })
         return text[:match.start()]
     return text

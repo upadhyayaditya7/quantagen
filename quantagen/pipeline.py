@@ -79,15 +79,146 @@ def filter_noise(text: str, losses=None) -> str:
         clean_lines.append(stripped)
     return "\n".join(clean_lines)
 
-def trim_structural_edges(text: str, losses=None) -> str:
-    """Blunt front/back-matter trim driven by config.json structural_rules.
+# Front matter is removed by evidence, not by percentage
+# (structural_rules.mode == "detect"): a table of contents is recognisable by
+# its dot leaders and a title block by short leading lines that stop at the
+# first real paragraph. Nothing is cut when neither signal is present, because
+# a missed cover page costs a few hundred tokens while a wrong cut costs
+# content -- and the percentage cut was measured doing exactly that (49 numbers
+# and 51 entities off the 6-page sample, including the start of its abstract).
+# A contents line carries a dot leader: ". . . . . ." or ".........". Counting
+# periods instead of a run was measured matching ordinary prose ("i.e.", "2014.",
+# reference lists) and inventing a table of contents inside a paper's body.
+TOC_LEADER = re.compile(r"(?:\.\s?){5,}")
+TOC_MIN_LINES = 3          # consecutive entries needed to call it a contents
+TITLE_BLOCK_MAX_LINES = 12 # never cut more leading lines than this
+PROSE_LINE_CHARS = 120     # a line this long is body text, not a title block
+# A one-page paper's title block is a couple of dozen characters but a fifth
+# of its text, so the percentage cap gets an absolute floor for short inputs.
+MIN_FRONT_MATTER_CHARS = 200
 
-    Removes the top n% and bottom n% of the raw text, where cover pages,
-    copyright blocks, tables of contents, and colophons typically live.
-    No-op when both percentages are 0 or absent. Removed spans go to
-    `losses` when provided.
+
+def _toc_run(lines, start: int) -> int:
+    """Length of the run of table-of-contents lines beginning at `start`.
+
+    Blank lines inside the run are tolerated (contents pages break columns),
+    but the run only counts when at least `TOC_MIN_LINES` entries carry dot
+    leaders -- one odd line with dots in prose must not cut a document.
     """
-    rules = load_config().get("structural_rules", {})
+    index, entries = start, 0
+    while index < len(lines):
+        line = lines[index]
+        if not line.strip():
+            index += 1
+            continue
+        if len(line.strip()) >= 12 and TOC_LEADER.search(line):
+            entries += 1
+            index += 1
+            continue
+        break
+    return index if entries >= TOC_MIN_LINES else 0
+
+
+def detect_front_matter_end(text: str) -> tuple:
+    """Offset where body text starts, plus the evidence for cutting there.
+
+    Returns ``(0, "")`` when nothing is confidently detected, so the caller
+    keeps the whole document instead of falling back to a percentage guess.
+    """
+    lines = text.splitlines(keepends=True)
+    if not lines:
+        return 0, ""
+
+    # 1. A table of contents. Everything before its last entry (cover, title,
+    #    preface, lists of symbols) is front matter; the cut ends inside the
+    #    document's opening quarter, which is where contents pages live.
+    search_limit = min(len(lines), max(200, int(len(lines) * 0.15)))
+    for start in range(search_limit):
+        end_line = _toc_run(lines, start)
+        if not end_line:
+            continue
+        while end_line < len(lines) and not lines[end_line].strip():
+            end_line += 1
+        removed = f"front matter before a {end_line - start}-line table of contents"
+        return sum(len(line) for line in lines[:end_line]), removed
+
+    # 2. A title block: short leading lines that stop at the first paragraph.
+    #    Hitting the line cap without meeting prose means the document is a
+    #    table or a list of short lines, which is content -- cut nothing.
+    consumed = 0
+    for index, line in enumerate(lines[:TITLE_BLOCK_MAX_LINES]):
+        if len(line.strip()) >= PROSE_LINE_CHARS:
+            break
+        consumed = index + 1
+    else:
+        return 0, ""
+    if not consumed:
+        return 0, ""
+    removed = f"title block ({consumed} lines before the first paragraph)"
+    return sum(len(line) for line in lines[:consumed]), removed
+
+
+def _record(losses, reason: str, span: str) -> None:
+    """Append one structural-trim ledger entry for a removed span."""
+    if losses is None or not span:
+        return
+    losses.append({
+        "stage": "structural trim",
+        "reason": reason,
+        "removed": span[:160],
+        "chars": len(span),
+        "_full": span,
+    })
+
+
+def _trim_tail_percent(text: str, rules: dict, losses=None) -> str:
+    """Honour an explicitly configured bottom percentage (default: none)."""
+    bottom = float(rules.get("strip_bottom_n_percent", 0) or 0)
+    if bottom <= 0 or not text:
+        return text
+    cut = int(len(text) * bottom)
+    if cut <= 0:
+        return text
+    newline = text.rfind("\n", 0, len(text) - cut)
+    end = newline if newline != -1 else len(text) - cut
+    if end <= 0 or not text[:end].strip():
+        return text
+    _record(losses, "tail trim", text[end:])
+    return text[:end]
+
+
+def _trim_detected_front_matter(text: str, rules: dict, losses=None) -> str:
+    """Cut the front matter a document can be shown to have, capped by config."""
+    end, reason = detect_front_matter_end(text)
+    if not end:
+        return text
+    cap = max(MIN_FRONT_MATTER_CHARS,
+              int(len(text) * float(rules.get("max_front_matter_pct", 0.15) or 0)))
+    if end > cap or not text[end:].strip():
+        return text
+    _record(losses, reason, text[:end])
+    return text[end:]
+
+
+def trim_structural_edges(text: str, losses=None) -> str:
+    """Front/back-matter trim driven by config.json structural_rules.
+
+    Two modes. ``detect`` (the default) removes front matter only where the
+    document shows a table of contents or a title block, and leaves back
+    matter to stop-marker truncation. ``percent`` removes the top/bottom n% of
+    the text, which is what earlier versions did unconditionally. Removed spans
+    go to `losses` when provided.
+    """
+    rules = load_config().get("structural_rules", {}) or {}
+    mode = str(rules.get("mode") or "percent").strip().lower()
+    if mode == "detect":
+        return _trim_tail_percent(
+            _trim_detected_front_matter(text, rules, losses), rules, losses)
+    return _trim_edges_percent(text, rules, losses)
+
+
+def _trim_edges_percent(text: str, rules: dict, losses=None) -> str:
+    """The original blind trim: top n% and bottom n% of the text."""
     top = float(rules.get("strip_top_n_percent", 0) or 0)
     bottom = float(rules.get("strip_bottom_n_percent", 0) or 0)
     if top <= 0 and bottom <= 0:
@@ -106,18 +237,10 @@ def trim_structural_edges(text: str, losses=None) -> str:
         end = newline if newline != -1 else end
     if start >= end or not text[start:end].strip():
         return text
-    head = text[:start] if top > 0 else ""
-    tail = text[end:] if bottom > 0 else ""
     if losses is not None:
-        for part, label in ((head, "head trim"), (tail, "tail trim")):
+        for part, label in ((text[:start], "head trim"), (text[end:], "tail trim")):
             if part:
-                losses.append({
-                    "stage": "structural trim",
-                    "reason": label,
-                    "removed": part[:160],
-                    "chars": len(part),
-                    "_full": part,
-                })
+                _record(losses, label, part)
     return text[start:end]
 
 def clean_pipeline(raw_text: str, stage_tokens: dict | None = None,
