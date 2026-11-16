@@ -97,6 +97,20 @@ def test_answer_span_requires_the_surrounding_sentence():
     assert survived["retained"] == 1
 
 
+def test_answer_span_recall_rejects_substring_numeric_match():
+    text = "The threshold is 10.53 units above the baseline."
+    items = [{"question": "What is the threshold?", "answer": "0.5",
+              "context": "The threshold is 10.53 units above the baseline."}]
+    assert retention.answer_span_recall(text, text, items)["retained"] == 0
+
+
+def test_answer_span_recall_keeps_an_exact_decimal():
+    text = "See Section 3.1 for the shared hypothesis space."
+    items = [{"question": "Which section?", "answer": "3.1",
+              "context": "See Section 3.1 for the shared hypothesis space."}]
+    assert retention.answer_span_recall(text, text, items)["retained"] == 1
+
+
 def test_context_coverage_tolerates_reflow_but_not_deletion():
     context = "Mountain hikers might be interested in data points that represent tours."
     reflowed = "Mountain hikers might be\ninterested in data points that represent tours."

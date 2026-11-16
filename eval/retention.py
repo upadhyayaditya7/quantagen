@@ -256,6 +256,25 @@ def context_coverage(context: str, text: str) -> float:
     return round(len(wanted & _shingles(text)) / len(wanted), 3)
 
 
+_NUMERIC_ANSWER_RE = re.compile(r"^[\d.,]+$")
+
+
+def _answer_present(answer: str, final: str, final_numbers: Counter) -> bool:
+    """Is `answer` present as a value, rather than as a coincidental substring?
+
+    Numeric answers are checked against the same normalised multiset the audit
+    uses, so "0.5" can no longer be found inside "10.53" and "3.1" inside
+    "3.14". Text answers need word boundaries, so "TCP" does not match inside
+    "TCPIP".
+    """
+    value = answer.strip()
+    if not value:
+        return False
+    if _NUMERIC_ANSWER_RE.match(value):
+        return bool(final_numbers.get(_normalize_number(value)))
+    return re.search(r"(?<!\w)" + re.escape(value) + r"(?!\w)", final) is not None
+
+
 def answer_span_recall(base: str, final: str, items: list) -> dict:
     """How many hand-curated question-bearing passages survived cleaning.
 
@@ -273,9 +292,7 @@ def answer_span_recall(base: str, final: str, items: list) -> dict:
         answer = str(item.get("answer", ""))
         wanted = _shingles(context)
         coverage = (len(wanted & final_shingles) / len(wanted)) if wanted else 1.0
-        present = answer in final if not answer.isdigit() else bool(
-            final_numbers.get(_normalize_number(answer))
-        )
+        present = _answer_present(answer, final, final_numbers)
         results.append({
             "question": item.get("question", ""),
             "answer": answer,
