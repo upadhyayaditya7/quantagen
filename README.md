@@ -176,6 +176,8 @@ app.py                       # Streamlit UI (same extraction + pipeline)
 bench/                       # open benchmark: 30-document corpus, fetch/verify, 5 extractor adapters
 bench/corpus.json            # documents by URL + sha256 (never bundled), category targets
 bench/README.md              # pre-registered rubric, coverage table, rules for adding a document
+bench/gold/                  # curated answer spans, each verified against the page it quotes
+bench/goldlib.py             # gold loader and validator (python bench/goldlib.py --check)
 eval/retention.py            # retention audit: numbers/entities/references/answer spans + stage blame
 eval/retrieval.py            # retrieval fidelity: BM25 hit@k / MRR, raw vs post-layout vs cleaned
 eval/compare.py              # head-to-head against other extractors (manual, not in CI)
@@ -183,7 +185,7 @@ eval/gold.json               # 18 curated answer-bearing passages (quoted from t
 config.json                  # the editable rules file for a checkout
 pyproject.toml               # packaging, console script, pinned dependencies
 requirements.txt             # pinned environment for CI and the numbers in this README
-tests/                       # 138 offline pytest tests (14 modules); real-token smoke test included
+tests/                       # 152 offline pytest tests (15 modules); real-token smoke test included
 .github/workflows/           # CI: pytest (Python 3.11 + 3.13) + retention and retrieval floors
 inputs/                      # sample PDFs (a Springer textbook + a research paper)
 outputs/                     # cleaned .txt, report.json, retention.json, retrieval.json (gitignored)
@@ -202,7 +204,7 @@ Run the test suite (offline — token counting is mocked; one opt-in test exerci
 
 ```bash
 pip install pytest
-python -m pytest tests -q   # 138 tests
+python -m pytest tests -q   # 152 tests
 ```
 
 ### CLI
@@ -291,7 +293,7 @@ All tunables live in [`config.json`](config.json). It resolves as `$QUANTAGEN_CO
 6. **Section extraction is heuristic.** In books with per-chapter "Summary" headings, the extracted "conclusion" is the first such section's text, not the book's conclusion. Fine for papers, imperfect for books.
 7. **Detection is English-centric.** Non-Latin *text survives cleaning*, but the stop markers, section markers and noise patterns themselves target English/journal conventions.
 8. **Loss ledger entries are previews, not full text.** Each entry carries exact char/token accounting, but records at most a 160-char preview of the removed text — enough to eyeball *what* and *why* per span.
-9. **`process_document()` still catches broad exceptions** (it prints the full traceback rather than raising to the caller). The pipeline itself (`clean_pipeline`) raises normally, the CLI exits non-zero when a document fails, and 138 offline tests + CI guard all documented behaviors.
+9. **`process_document()` still catches broad exceptions** (it prints the full traceback rather than raising to the caller). The pipeline itself (`clean_pipeline`) raises normally, the CLI exits non-zero when a document fails, and 152 offline tests + CI guard all documented behaviors.
 10. **Image-only detection is per document, not per page.** A text PDF with a few scanned pages keeps its text pages and silently drops the scanned ones. Whole-document OCR is implemented; per-page fallback inside the layout pass is not, and it needs OCR text to be woven into reading order rather than appended.
 
 ## Fixed issues

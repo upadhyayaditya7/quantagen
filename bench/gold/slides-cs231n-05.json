@@ -1,0 +1,75 @@
+{
+  "schema_version": 1,
+  "id": "slides-cs231n-05",
+  "category": "slides",
+  "sha256": "0e1e74490912335b99f3b8856eb2d10d5bbba429717ebceb425957b69cc26f6c",
+  "readable": true,
+  "curated": "2026-11-17",
+  "note": "History-of-the-field slides: one line per bullet, no surrounding prose to recover a dropped line from.",
+  "spans": [
+    {
+      "id": "rosenblatt-year",
+      "kind": "answer",
+      "question": "In what year did Rosenblatt introduce the Perceptron?",
+      "answer": "1957",
+      "quote": "Frank Rosenblatt, ~1957: Perceptron",
+      "page_index": 20
+    },
+    {
+      "id": "perceptron-pixels",
+      "kind": "answer",
+      "question": "How large was the Perceptron's input?",
+      "answer": "400-pixel",
+      "quote": "20×20 cadmium sulfide photocells to produce a 400-pixel",
+      "page_index": 20
+    },
+    {
+      "id": "adaline-year",
+      "kind": "answer",
+      "question": "When did Widrow and Hoff publish Adaline/Madaline?",
+      "answer": "1960",
+      "quote": "Widrow and Hoff, ~1960: Adaline/Madaline",
+      "page_index": 21
+    },
+    {
+      "id": "backprop-year",
+      "kind": "answer",
+      "question": "When did back-propagation first become popular?",
+      "answer": "1986",
+      "quote": "Rumelhart et al. 1986: First time back-propagation became popular",
+      "page_index": 22
+    },
+    {
+      "id": "two-layer-name",
+      "kind": "answer",
+      "question": "What is a network with one hidden layer also called?",
+      "answer": "2-layer Neural Net",
+      "quote": "“2-layer Neural Net”",
+      "page_index": 18
+    },
+    {
+      "id": "one-hidden-name",
+      "kind": "answer",
+      "question": "What is the alternative name for the same network?",
+      "answer": "1-hidden-layer Neural Net",
+      "quote": "“1-hidden-layer Neural Net”",
+      "page_index": 18
+    },
+    {
+      "id": "dahl-year",
+      "kind": "answer",
+      "question": "Which 2010 work is credited on this slide?",
+      "answer": "2010",
+      "quote": "George Dahl, Dong Yu, Li Deng, Alex Acero, 2010",
+      "page_index": 24
+    },
+    {
+      "id": "alexnet-year",
+      "kind": "answer",
+      "question": "Who is credited alongside Sutskever and Hinton, and in what year?",
+      "answer": "2012",
+      "quote": "Alex Krizhevsky, Ilya Sutskever, Geoffrey E Hinton, 2012",
+      "page_index": 24
+    }
+  ]
+}

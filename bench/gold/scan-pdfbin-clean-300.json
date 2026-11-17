@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "id": "scan-pdfbin-clean-300",
+  "category": "scanned",
+  "sha256": "5310aea82cb8ba3a9aa5073d90cb198689a06d43cb5d51b648b68d76d30b512b",
+  "readable": false,
+  "curated": "2026-11-17",
+  "expectation": "No text layer. The correct result is a documented skip (ExtractionUnavailable or an explicit image-only finding), never an empty string presented as a 100% reduction.",
+  "note": "Representative of the six scanned fixtures: any answer span here would be a lie about what the bytes contain.",
+  "spans": []
+}

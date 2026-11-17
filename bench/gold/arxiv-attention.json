@@ -1,0 +1,75 @@
+{
+  "schema_version": 1,
+  "id": "arxiv-attention",
+  "category": "single-column",
+  "sha256": "bdfaa68d8984f0dc02beaca527b76f207d99b666d31d1da728ee0728182df697",
+  "readable": true,
+  "curated": "2026-11-17",
+  "note": "Training-details page: the numbers that a reflow or a line filter destroys first.",
+  "spans": [
+    {
+      "id": "train-set-size",
+      "kind": "answer",
+      "question": "How large was the WMT 2014 English-German training set?",
+      "answer": "4.5 million",
+      "quote": "We trained on the standard WMT 2014 English-German dataset consisting of about 4.5 million",
+      "page_index": 6
+    },
+    {
+      "id": "shared-vocabulary",
+      "kind": "answer",
+      "question": "What was the size of the shared source-target vocabulary?",
+      "answer": "37000 tokens",
+      "quote": "target vocabulary of about 37000 tokens",
+      "page_index": 6
+    },
+    {
+      "id": "en-fr-sentences",
+      "kind": "answer",
+      "question": "How many sentences were in the English-French dataset?",
+      "answer": "36M sentences",
+      "quote": "2014 English-French dataset consisting of 36M sentences",
+      "page_index": 6
+    },
+    {
+      "id": "hardware",
+      "kind": "answer",
+      "question": "What hardware were the models trained on?",
+      "answer": "8 NVIDIA P100 GPUs",
+      "quote": "We trained our models on one machine with 8 NVIDIA P100 GPUs.",
+      "page_index": 6
+    },
+    {
+      "id": "base-training-time",
+      "kind": "answer",
+      "question": "How long did the base models train for?",
+      "answer": "12 hours",
+      "quote": "trained the base models for a total of 100,000 steps or 12 hours.",
+      "page_index": 6
+    },
+    {
+      "id": "base-step-time",
+      "kind": "answer",
+      "question": "How long did one base-model training step take?",
+      "answer": "0.4 seconds",
+      "quote": "each training step took about 0.4 seconds",
+      "page_index": 6
+    },
+    {
+      "id": "big-model-steps",
+      "kind": "answer",
+      "question": "How many steps did the big models train for?",
+      "answer": "300,000 steps",
+      "quote": "The big models were trained for 300,000 steps",
+      "page_index": 6
+    },
+    {
+      "id": "big-step-time",
+      "kind": "answer",
+      "question": "What was the step time for the big models?",
+      "answer": "1.0 seconds",
+      "quote": "step time was 1.0 seconds",
+      "page_index": 6
+    }
+  ]
+}

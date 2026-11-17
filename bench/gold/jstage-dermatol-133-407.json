@@ -1,0 +1,59 @@
+{
+  "schema_version": 1,
+  "id": "jstage-dermatol-133-407",
+  "category": "non-latin",
+  "sha256": "114af813be8ab369b8b2610da51339a0b6e7ec876ba12731a5869c50f33b5d08",
+  "readable": true,
+  "curated": "2026-11-17",
+  "note": "Verbatim spans only. The property under test is that CJK runs are not treated as noise; an English question about Japanese prose would test the curator, not the extractor.",
+  "spans": [
+    {
+      "id": "definition",
+      "kind": "verbatim",
+      "quote": "尋常性痤瘡は，アクネあるいはニキビとも呼称され",
+      "page_index": 0
+    },
+    {
+      "id": "chronic-inflammatory",
+      "kind": "verbatim",
+      "quote": "細菌の増殖が複雑に関与する慢性炎症性疾患である．",
+      "page_index": 0
+    },
+    {
+      "id": "prevalence-90",
+      "kind": "verbatim",
+      "quote": "本邦では90％以上の人が経験する疾患であることか",
+      "page_index": 0
+    },
+    {
+      "id": "ten-percent-visit",
+      "kind": "verbatim",
+      "quote": "10％に過ぎず，受診した患者の治療に対する満足度も",
+      "page_index": 0
+    },
+    {
+      "id": "qol",
+      "kind": "verbatim",
+      "quote": "の質（quality of life：QOL）は低下しており，中高生",
+      "page_index": 0
+    },
+    {
+      "id": "guideline-2008",
+      "kind": "verbatim",
+      "quote": "2008 年の尋常性痤瘡治療ガイドラインは，痤瘡治療",
+      "page_index": 0
+    },
+    {
+      "id": "adapalene-2008",
+      "kind": "verbatim",
+      "quote": "中心だった．2008 年にアダパレンが導入され，面皰に",
+      "page_index": 0
+    },
+    {
+      "id": "oe-lep-guideline",
+      "kind": "verbatim",
+      "quote": "た．また，日本産科婦人科学会の「OE・LEP ガイド",
+      "page_index": 0
+    }
+  ]
+}

@@ -1,0 +1,75 @@
+{
+  "schema_version": 1,
+  "id": "table-springernature-fs",
+  "category": "tables",
+  "sha256": "7d38ee2e0930f74b68b36d40641a2c0f6a3ae35e597ee95af3c61a710e10e985",
+  "readable": true,
+  "curated": "2026-11-17",
+  "note": "Notes to the accounts. Each quote is one printed line, so a broken row order shows up as a lost span rather than as a plausible-looking number.",
+  "spans": [
+    {
+      "id": "aje-divestment-loss",
+      "kind": "answer",
+      "question": "What net loss did the divestment of AJE produce?",
+      "answer": "€5.0 million",
+      "quote": "mainly included the net loss of €5.0 million from the divestment of AJE.",
+      "page_index": 20
+    },
+    {
+      "id": "amortisation-intangibles",
+      "kind": "answer",
+      "question": "How much amortisation of other intangible assets was recognised?",
+      "answer": "€87.6 million",
+      "quote": "The line item ‘Amortisation of other intangible assets’ included €87.6 million (2024: €96.7 million) for the amortisation",
+      "page_index": 20
+    },
+    {
+      "id": "amortisation-fair-value",
+      "kind": "answer",
+      "question": "How much amortisation came from past business combination fair value adjustments?",
+      "answer": "€94.1 million",
+      "quote": "amortisation expenses of €94.1 million",
+      "page_index": 20
+    },
+    {
+      "id": "depreciation-ppe",
+      "kind": "answer",
+      "question": "What were the depreciation charges for property, plant and equipment?",
+      "answer": "€0.7 million",
+      "quote": "depreciation charges of €0.7 million for property, plant and equipment",
+      "page_index": 20
+    },
+    {
+      "id": "goodwill-impairment",
+      "kind": "answer",
+      "question": "What impairment loss was recognised on goodwill?",
+      "answer": "€0.5 million",
+      "quote": "Impairment losses of €0.5 million on goodwill (2024: €3.9 million on other intangible",
+      "page_index": 20
+    },
+    {
+      "id": "fx-forwards",
+      "kind": "answer",
+      "question": "What was the loss on FX forwards?",
+      "answer": "€15.2 million",
+      "quote": "of interest rate hedging instruments of €0.8 million (2024: €14.6 million) and FX forwards of €15.2 million (2024: €20.6 million).",
+      "page_index": 21
+    },
+    {
+      "id": "financing-liabilities",
+      "kind": "answer",
+      "question": "What loss came from financing-related assets and liabilities?",
+      "answer": "€34.3 million",
+      "quote": "and financing-related assets and liabilities of €34.3 million (2024: €5.4 million) as well as realised losses from FX hedge",
+      "page_index": 21
+    },
+    {
+      "id": "senior-loan-reference",
+      "kind": "answer",
+      "question": "Which note explains the interest on senior loans?",
+      "answer": "note 25",
+      "quote": "The decrease related to lower interest for senior loans due to repayments in 2024 and 2025 (see also note 25).",
+      "page_index": 21
+    }
+  ]
+}

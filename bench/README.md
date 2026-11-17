@@ -10,16 +10,17 @@ questions its own author wrote.
 
 ## Status
 
-Step 2 of 5. What exists today:
+Step 3 of 5. What exists today:
 
 - `corpus.json` — the manifest: **30 hash-verified documents** across 7 categories,
   four of them at target (6 documents)
 - `fetch.py` — download, verify, pin hashes; refuses to score page-swapped inputs
 - `adapters/` — one interface, five extractors (quantagen, raw PyMuPDF, pymupdf4llm, markitdown, docling)
+- `gold/` — curated answer spans for **5 of 30 documents**, each verified against the
+  page it quotes
 
-Not yet built: `gold/` (answer spans and must-survive facts per document),
-`metrics.py`, `report.py` → `RESULTS.md`, and the scheduled CI job that
-regenerates results. **No cross-tool numbers exist yet, and none will be quoted
+Not yet built: gold for the remaining 25 documents, `metrics.py`, `report.py` →
+`RESULTS.md`, and the scheduled CI job that regenerates results. **No cross-tool numbers exist yet, and none will be quoted
 until every category has six documents.**
 
 ## Coverage
@@ -114,6 +115,63 @@ number of entries in that category, a cached document's page count must match it
 **Never commit a copyrighted PDF.** Springer textbooks and journal papers stay
 behind a URL or in `inputs/` as an existing development sample; the manifest
 records the hash and the licence so nobody redistributes one by accident.
+
+## gold/
+
+One file per curated document, `bench/gold/<id>.json`. The quote is the evidence, so
+the file is checkable instead of asserted.
+
+```jsonc
+{
+  "schema_version": 1,
+  "id": "arxiv-attention",
+  "category": "single-column",     // must match corpus.json
+  "sha256": "bdfaa68d…",           // the bytes this gold was curated against
+  "readable": true,
+  "curated": "2026-11-17",
+  "spans": [
+    { "id": "big-model-steps", "kind": "answer",
+      "question": "How many steps did the big models train for?",
+      "answer": "300,000 steps",
+      "quote": "The big models were trained for 300,000 steps",
+      "page_index": 6 }             // 0-based, as PyMuPDF numbers pages
+  ]
+}
+```
+
+What the validator enforces, and why each rule is there:
+
+- **8–10 spans** for a readable document, each with a unique id. One span is an
+  anecdote; ten is a measurement.
+- **The answer must appear inside its own quote.** Otherwise the question, the quote
+  and the answer are three unrelated claims that happen to share a file.
+- **The quote must be on the page it names**, in that page's own text. This is the
+  rule that catches a hand-edited quote, a stale file, and a document that was
+  re-fetched with different bytes.
+- **`sha256` must match the corpus entry**, so new bytes invalidate the gold loudly.
+- **A quote shorter than 20 characters — or 10 CJK characters — is rejected.** A bare
+  number is not evidence: every extractor keeps digits, and a span of "4.5" would
+  score all of them as perfect. The CJK floor exists because a character floor is
+  Latin-centric: Japanese carries several words per character, so the same
+  information arrives in fewer of them.
+- **`readable: false` documents may not carry spans at all** and must say what the
+  correct behaviour is instead. A scan without OCR has to produce a reported skip,
+  never an empty string passed off as a 100% reduction.
+
+`kind: "verbatim"` exists for non-Latin documents, where the property under test is
+that CJK survives at all. Writing English questions about Japanese prose would test
+the curator, not the extractor.
+
+```bash
+python bench/goldlib.py --check       # every file, every quote, against the PDFs
+python bench/goldlib.py --coverage    # curated documents per category
+python bench/goldlib.py --check --no-documents   # structure only, no PDFs needed
+```
+
+Current state: **5 documents, 32 spans.** Four readable (single-column, tables,
+slides, non-Latin) plus one image-only fixture. The other 25 documents have no gold
+and therefore no score — that is the honest reading of the coverage table below, and
+it is why no results are published yet.
 
 ## Commands
 
