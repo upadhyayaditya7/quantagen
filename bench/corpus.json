@@ -4,10 +4,15 @@
   "_notes": [
     "The rubric and the category targets were written before any adapter scores exist.",
     "Documents are referenced, not bundled: a URL plus a SHA-256. Copyrighted PDFs",
-    "(textbooks, journals) are never added to a downloadable corpus; the two already",
-    "in inputs/ stay local and are marked as not redistributable.",
+    "(textbooks, journals, annual reports, course slides) are never added to a",
+    "downloadable corpus; the two already in inputs/ stay local and are marked as",
+    "not redistributable.",
     "`sha256: null` means the document has not been fetched and pinned yet. fetch.py",
     "reports those as unpinned and refuses to score them until --record pins the hash.",
+    "The `scanned` documents are purpose-built image-only fixtures (clean, noisy,",
+    "skewed, multi-page) rather than photographs of paper. What that category tests is",
+    "the absence of a text layer, which these reproduce exactly; tests/test_bench.py",
+    "asserts every one of them extracts zero characters.",
     "JSON rather than YAML so that fetch.py, the tests and CI need no new dependency;",
     "the schema and the rules for adding a document are in bench/README.md."
   ],
@@ -30,22 +35,22 @@
     },
     "tables": {
       "target": 6,
-      "current": 0,
+      "current": 6,
       "stresses": "financial tables and 10-K layouts; where every extractor loses data"
     },
     "slides": {
       "target": 6,
-      "current": 0,
+      "current": 6,
       "stresses": "sparse pages, large type, no paragraphs, one line per bullet"
     },
     "non-latin": {
       "target": 6,
-      "current": 0,
+      "current": 6,
       "stresses": "the unicode-aware filter and the English-only stop markers"
     },
     "scanned": {
       "target": 6,
-      "current": 0,
+      "current": 6,
       "stresses": "no-text-layer detection, OCR availability, honest skipping"
     }
   },
@@ -109,6 +114,246 @@
       "redistributable": true,
       "license": "arXiv (see the paper's own license)",
       "why": "75 pages: the runtime and memory case, not just the quality case"
+    },
+    {
+      "id": "table-springernature-fs",
+      "category": "tables",
+      "source": { "kind": "url", "url": "https://annualreport.springernature.com/2025/files/sn-ar-25-consolidated-financial-statements.pdf" },
+      "sha256": "7d38ee2e0930f74b68b36d40641a2c0f6a3ae35e597ee95af3c61a710e10e985",
+      "pages": 75,
+      "redistributable": false,
+      "license": "Springer Nature annual report; referenced, not redistributed",
+      "why": "notes to the accounts: dozens of small multi-column tables, each with a footnote key"
+    },
+    {
+      "id": "table-nyc-acfr",
+      "category": "tables",
+      "source": { "kind": "url", "url": "https://comptroller.nyc.gov/wp-content/uploads/documents/ACFR-2026.pdf" },
+      "sha256": "5ad1b59d619a7edaab50a67bbb803fd12a9d271f37ae28c0ba6f2c1c19fad7ec",
+      "pages": 543,
+      "redistributable": false,
+      "license": "New York City Comptroller; referenced, not redistributed",
+      "why": "543 pages of municipal statements and statistical schedules: the volume and memory case"
+    },
+    {
+      "id": "table-panynj-acfr",
+      "category": "tables",
+      "source": { "kind": "url", "url": "https://www.panynj.gov/content/dam/corporate/annual-reports/annual-report-2025.pdf" },
+      "sha256": "db576a7167112ba57f573b84c0ea51c53fdb0dfa486b3c91c7dd42adaf1fdbf0",
+      "pages": 150,
+      "redistributable": false,
+      "license": "Port Authority of NY and NJ; referenced, not redistributed",
+      "why": "wide five-column statements inside a landscape-leaning report body"
+    },
+    {
+      "id": "table-bog-ar2024",
+      "category": "tables",
+      "source": { "kind": "url", "url": "https://www.bog.gov.gh/wp-content/uploads/2025/07/2024-Annual-Report-and-Financial-Statements-1.pdf" },
+      "sha256": "18a65f1d63d1eaef0d23741283b6596fa623028cbd757e11c31e567552b545c3",
+      "pages": 152,
+      "redistributable": false,
+      "license": "Bank of Ghana; referenced, not redistributed",
+      "why": "infographic-heavy opening pages before the statements: prose and tables with no column structure"
+    },
+    {
+      "id": "table-dbsa-afs2025",
+      "category": "tables",
+      "source": { "kind": "url", "url": "https://www.dbsa.org/sites/default/files/media/documents/2025-09/DBSA%20Annual%20Financial%20Statements%202025.pdf" },
+      "sha256": "9def57e5b22b79956bdce0846ddeb3f99fe89e7910d94ddd13c9f7598d155151",
+      "pages": 91,
+      "redistributable": false,
+      "license": "Development Bank of Southern Africa; referenced, not redistributed",
+      "why": "thousands-separators in a space format, and left-hand note references every table row shares"
+    },
+    {
+      "id": "table-cardiffmet-afs",
+      "category": "tables",
+      "source": { "kind": "url", "url": "https://www.cardiffmet.ac.uk/media/cardiff-met/content-assets/english-documents/Annual-Report-and-Financial-Statements-2023-24.pdf" },
+      "sha256": "9817b0f7eb35a2dabb44b79fe0bcaf68ac15efbae0d3724637c6254af922db69",
+      "pages": 41,
+      "redistributable": false,
+      "license": "Cardiff Metropolitan University; referenced, not redistributed",
+      "why": "the short case: 41 pages where a percentage-based trim is a large fraction of the document"
+    },
+    {
+      "id": "slides-cs231n-01",
+      "category": "slides",
+      "source": { "kind": "url", "url": "https://cs231n.stanford.edu/slides/2016/winter1516_lecture1.pdf" },
+      "sha256": "c617e6083151c3fc207edab5bfc67c3a5a46189519436e244476aeed153bd336",
+      "pages": 47,
+      "redistributable": false,
+      "license": "Stanford CS231n course slides; referenced, not redistributed",
+      "why": "title and overview deck: pages that are one image and almost no text"
+    },
+    {
+      "id": "slides-cs231n-03",
+      "category": "slides",
+      "source": { "kind": "url", "url": "https://cs231n.stanford.edu/slides/2016/winter1516_lecture3.pdf" },
+      "sha256": "a84bc77c47ae39bccce0f9ea412f78e70d64a0b85d4e1848cb07fd09df012fc6",
+      "pages": 76,
+      "redistributable": false,
+      "license": "Stanford CS231n course slides; referenced, not redistributed",
+      "why": "code-listing slides: monospace blocks the line filter has to keep intact"
+    },
+    {
+      "id": "slides-cs231n-05",
+      "category": "slides",
+      "source": { "kind": "url", "url": "https://cs231n.stanford.edu/slides/2016/winter1516_lecture5.pdf" },
+      "sha256": "0e1e74490912335b99f3b8856eb2d10d5bbba429717ebceb425957b69cc26f6c",
+      "pages": 102,
+      "redistributable": false,
+      "license": "Stanford CS231n course slides; referenced, not redistributed",
+      "why": "dense 102-page deck: bullets that look like paragraphs and defeat a line-length filter"
+    },
+    {
+      "id": "slides-cs231n-07",
+      "category": "slides",
+      "source": { "kind": "url", "url": "https://cs231n.stanford.edu/slides/2016/winter1516_lecture7.pdf" },
+      "sha256": "9897c39a558a1e3298d7279b3f4f7dd90900a6e61f6798f6ba01c130430fb680",
+      "pages": 89,
+      "redistributable": false,
+      "license": "Stanford CS231n course slides; referenced, not redistributed",
+      "why": "figure captions and slide credits: text that sits in a footer, not in reading order"
+    },
+    {
+      "id": "slides-cs231n-08",
+      "category": "slides",
+      "source": { "kind": "url", "url": "https://cs231n.stanford.edu/slides/2016/winter1516_lecture8.pdf" },
+      "sha256": "b5c314a090e2cc475d1d4c8d22e22fc7dfd19e41069df8316cf3720c9396a816",
+      "pages": 90,
+      "redistributable": false,
+      "license": "Stanford CS231n course slides; referenced, not redistributed",
+      "why": "training-curve slides: axis labels and legends interleaved with bullet text"
+    },
+    {
+      "id": "slides-mit-6874-05",
+      "category": "slides",
+      "source": { "kind": "url", "url": "https://mit6874.github.io/assets/sp2021/slides/l05.pdf" },
+      "sha256": "0e217e536a1f01b7c3329fc237f87375e58f678f97659e5860b4f8928f7a99c4",
+      "pages": 83,
+      "redistributable": false,
+      "license": "MIT 6.874 course slides; referenced, not redistributed",
+      "why": "a second producer's slide toolchain, so the category is not one exporter's quirks"
+    },
+    {
+      "id": "jstage-scjer-4-01",
+      "category": "non-latin",
+      "source": { "kind": "url", "url": "https://www.jstage.jst.go.jp/article/scjer/4/0/4_1/_pdf/-char/ja" },
+      "sha256": "d7e64eac4f3c5e3a6f91ef055c022e593d202b5d0981c0c3f5a9e0b14392cb03",
+      "pages": 10,
+      "redistributable": false,
+      "license": "J-STAGE, journal free access; referenced, not redistributed",
+      "why": "Chinese text with no inter-word spaces: a word-count filter has nothing to count"
+    },
+    {
+      "id": "jstage-scjer-5-01",
+      "category": "non-latin",
+      "source": { "kind": "url", "url": "https://www.jstage.jst.go.jp/article/scjer/5/0/5_1/_pdf/-char/ja" },
+      "sha256": "d63c240252977028536fe2f634f9dbfbac35aa86214aa91ccd3e27128aa8e332",
+      "pages": 8,
+      "redistributable": false,
+      "license": "J-STAGE, journal free access; referenced, not redistributed",
+      "why": "a second Chinese document from the same journal: consistent baseline for the filter rules"
+    },
+    {
+      "id": "jstage-scjer-4-09",
+      "category": "non-latin",
+      "source": { "kind": "url", "url": "https://www.jstage.jst.go.jp/article/scjer/4/0/4_9/_pdf/-char/ja" },
+      "sha256": "1c4a3ec96123894caeedebe8d0c3fd484a241cfeff2c85f8ed6b3ae4fb4a4349",
+      "pages": 10,
+      "redistributable": false,
+      "license": "J-STAGE, journal free access; referenced, not redistributed",
+      "why": "Chinese abstract plus an English-language reference list in the same document"
+    },
+    {
+      "id": "jstage-scjer-7-06",
+      "category": "non-latin",
+      "source": { "kind": "url", "url": "https://www.jstage.jst.go.jp/article/scjer/7/0/7_6/_pdf/-char/ja" },
+      "sha256": "2e705c0ce7d97c18d9513166f13a3b24341f0a9b7087744ba46de5f9b78d9b69",
+      "pages": 12,
+      "redistributable": false,
+      "license": "J-STAGE, journal free access; referenced, not redistributed",
+      "why": "Japanese and Chinese author names in Latin and native script on one title page"
+    },
+    {
+      "id": "jstage-dermatol-133-407",
+      "category": "non-latin",
+      "source": { "kind": "url", "url": "https://www.jstage.jst.go.jp/article/dermatol/133/3/133_407/_pdf/-char/ja" },
+      "sha256": "114af813be8ab369b8b2610da51339a0b6e7ec876ba12731a5869c50f33b5d08",
+      "pages": 44,
+      "redistributable": false,
+      "license": "J-STAGE, journal free access; referenced, not redistributed",
+      "why": "Japanese prose with vertical-friendly punctuation and mixed CJK/Latin runs across 44 pages"
+    },
+    {
+      "id": "jstage-eis-53-04",
+      "category": "non-latin",
+      "source": { "kind": "url", "url": "https://www.jstage.jst.go.jp/article/eis/53/2/53_4/_pdf/-char/ja" },
+      "sha256": "78c85095b464b0b947d62e2d7dd22af1b5539718fe02edc813c6acb6d18dcf37",
+      "pages": 5,
+      "redistributable": false,
+      "license": "J-STAGE, journal free access; referenced, not redistributed",
+      "why": "Japanese short paper with figures: the smallest non-Latin case"
+    },
+    {
+      "id": "scan-pdfbin-clean-300",
+      "category": "scanned",
+      "source": { "kind": "url", "url": "https://pdfbin.net/scanned-clean-300dpi.pdf" },
+      "sha256": "5310aea82cb8ba3a9aa5073d90cb198689a06d43cb5d51b648b68d76d30b512b",
+      "pages": 1,
+      "redistributable": false,
+      "license": "Public test fixture; referenced, not redistributed",
+      "why": "image-only page at 300 dpi: extraction must return nothing and the pipeline must not pretend it read it"
+    },
+    {
+      "id": "scan-pdfbin-noisy-300",
+      "category": "scanned",
+      "source": { "kind": "url", "url": "https://pdfbin.net/scanned-noisy-300dpi.pdf" },
+      "sha256": "f45872984357eb9094e3107155901ca57df7a611d661e69c8a2ca2fa22418049",
+      "pages": 1,
+      "redistributable": false,
+      "license": "Public test fixture; referenced, not redistributed",
+      "why": "speckle noise: the case where an OCR fallback finds text that is not there"
+    },
+    {
+      "id": "scan-pdfbin-skewed-3deg",
+      "category": "scanned",
+      "source": { "kind": "url", "url": "https://pdfbin.net/scanned-skewed-3deg.pdf" },
+      "sha256": "3e10ad087e0495a952f3b3d3313503f353a1469b1be7dea506a9c520615d4be7",
+      "pages": 1,
+      "redistributable": false,
+      "license": "Public test fixture; referenced, not redistributed",
+      "why": "three degrees of skew: baseline detection must not treat a tilted page as a two-column layout"
+    },
+    {
+      "id": "scan-pdfbin-skewed-noisy",
+      "category": "scanned",
+      "source": { "kind": "url", "url": "https://pdfbin.net/scanned-skewed-noisy.pdf" },
+      "sha256": "73521f32566f00147ef1c442c2821acc48119a9380c5c1681c66c7d1f96eba83",
+      "pages": 1,
+      "redistributable": false,
+      "license": "Public test fixture; referenced, not redistributed",
+      "why": "skew plus noise: the hardest image-only case, and the one that should fail loudly, not quietly"
+    },
+    {
+      "id": "scan-samplelib-2pp",
+      "category": "scanned",
+      "source": { "kind": "url", "url": "https://samplelib.com/pdf/sample-scanned.pdf" },
+      "sha256": "f0ca428c3a03350088ca78aba9b24dee3bcbac23ecbfa07a0eac4260db09f04b",
+      "pages": 2,
+      "redistributable": false,
+      "license": "Public test fixture; referenced, not redistributed",
+      "why": "two raster pages: per-document skipping must not depend on a single page's emptiness"
+    },
+    {
+      "id": "scan-pdftoolskit-3pp",
+      "category": "scanned",
+      "source": { "kind": "url", "url": "https://pdftoolskit.org/samples/sample-scanned.pdf" },
+      "sha256": "d32a62e246778d856c85b03bfc6c91c36c9a071756b733f78daf46b4253de634",
+      "pages": 3,
+      "redistributable": false,
+      "license": "CC0 per the host's sample page; referenced, not redistributed",
+      "why": "three JPEG-only pages at 150 dpi with a paper tone: the most scanner-like fixture here"
     }
   ]
 }

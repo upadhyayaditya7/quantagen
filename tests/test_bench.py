@@ -8,6 +8,7 @@ or generated on the fly.
 
 import json
 import os
+import re
 
 import fitz
 import pytest
@@ -32,6 +33,18 @@ def test_every_document_has_a_category_with_a_target():
     corpus = fetch.load_corpus()
     for entry in corpus["documents"]:
         assert entry["category"] in corpus["coverage"]
+
+
+def test_coverage_counts_match_the_documents():
+    # A stale "current" would overstate the corpus to anyone reading the manifest.
+    corpus = fetch.load_corpus()
+    counted = {}
+    for entry in corpus["documents"]:
+        counted[entry["category"]] = counted.get(entry["category"], 0) + 1
+    for category, block in corpus["coverage"].items():
+        if category.startswith("_"):
+            continue
+        assert block["current"] == counted.get(category, 0), category
 
 
 def test_validate_rejects_a_duplicate_id():
@@ -131,6 +144,60 @@ def test_a_missing_tool_explains_how_to_install_it():
         pytest.skip("docling is installed here")
     with pytest.raises(MissingTool, match="pip install docling"):
         adapter.extract("inputs/researchpaperOnSustainableDev.pdf")
+
+
+def _verified(entry):
+    return fetch.status(entry)["state"] == "verified"
+
+
+def test_cached_documents_match_their_pinned_page_count():
+    # A page-count drift means the URL now serves a different document than the
+    # hash was recorded against, which no token ratio should be computed over.
+    checked = 0
+    for entry in fetch.load_corpus()["documents"]:
+        if not _verified(entry):
+            continue
+        doc = fitz.open(fetch.source_path(entry))
+        assert doc.page_count == entry["pages"], entry["id"]
+        doc.close()
+        checked += 1
+    if not checked:
+        pytest.skip("nothing is cached yet; run python bench/fetch.py")
+
+
+def test_scanned_fixtures_have_no_text_layer():
+    # This is the entire point of the category: if a fixture grew a text layer it
+    # would stop testing the no-OCR path while still reporting "scanned".
+    checked = 0
+    for entry in fetch.load_corpus()["documents"]:
+        if entry["category"] != "scanned" or not _verified(entry):
+            continue
+        doc = fitz.open(fetch.source_path(entry))
+        characters = sum(len(page.get_text()) for page in doc)
+        doc.close()
+        assert characters == 0, f"{entry['id']} has {characters} extractable characters"
+        checked += 1
+    if not checked:
+        pytest.skip("nothing is cached yet; run python bench/fetch.py")
+
+
+CJK = re.compile(r"[\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff]")
+
+
+def test_non_latin_documents_really_contain_cjk():
+    # Guards against a document drifting into the one category whose rules it
+    # does not exercise.
+    checked = 0
+    for entry in fetch.load_corpus()["documents"]:
+        if entry["category"] != "non-latin" or not _verified(entry):
+            continue
+        doc = fitz.open(fetch.source_path(entry))
+        text = "".join(page.get_text() for page in doc)
+        doc.close()
+        assert CJK.search(text), entry["id"]
+        checked += 1
+    if not checked:
+        pytest.skip("nothing is cached yet; run python bench/fetch.py")
 
 
 def test_quantagen_adapter_extracts_a_generated_pdf(tmp_path):
