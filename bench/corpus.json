@@ -1,0 +1,114 @@
+{
+  "schema_version": 1,
+  "preregistered": "2026-11-17",
+  "_notes": [
+    "The rubric and the category targets were written before any adapter scores exist.",
+    "Documents are referenced, not bundled: a URL plus a SHA-256. Copyrighted PDFs",
+    "(textbooks, journals) are never added to a downloadable corpus; the two already",
+    "in inputs/ stay local and are marked as not redistributable.",
+    "`sha256: null` means the document has not been fetched and pinned yet. fetch.py",
+    "reports those as unpinned and refuses to score them until --record pins the hash.",
+    "JSON rather than YAML so that fetch.py, the tests and CI need no new dependency;",
+    "the schema and the rules for adding a document are in bench/README.md."
+  ],
+  "coverage": {
+    "_target": "6 documents per category before results are published",
+    "single-column": {
+      "target": 6,
+      "current": 4,
+      "stresses": "plain reading order; baseline for every other category"
+    },
+    "two-column": {
+      "target": 6,
+      "current": 1,
+      "stresses": "XY-cut column separation, running heads between columns"
+    },
+    "textbook": {
+      "target": 6,
+      "current": 1,
+      "stresses": "TOC, index, glossary, figure captions, per-chapter summaries"
+    },
+    "tables": {
+      "target": 6,
+      "current": 0,
+      "stresses": "financial tables and 10-K layouts; where every extractor loses data"
+    },
+    "slides": {
+      "target": 6,
+      "current": 0,
+      "stresses": "sparse pages, large type, no paragraphs, one line per bullet"
+    },
+    "non-latin": {
+      "target": 6,
+      "current": 0,
+      "stresses": "the unicode-aware filter and the English-only stop markers"
+    },
+    "scanned": {
+      "target": 6,
+      "current": 0,
+      "stresses": "no-text-layer detection, OCR availability, honest skipping"
+    }
+  },
+  "documents": [
+    {
+      "id": "ml-basics-book",
+      "category": "textbook",
+      "source": { "kind": "local", "path": "inputs/MLBasicsBook.pdf" },
+      "sha256": "787c05418a62649ffbea3f61cf57cd84982abb89ad6474ecb15b86e0981d18c0",
+      "pages": 288,
+      "redistributable": false,
+      "license": "Springer, all rights reserved; present in this repo as a development sample",
+      "why": "front matter with a real TOC, an index and a glossary: the document that broke the percent trim"
+    },
+    {
+      "id": "ijrte-sustainable-dev",
+      "category": "two-column",
+      "source": { "kind": "local", "path": "inputs/researchpaperOnSustainableDev.pdf" },
+      "sha256": "10b75d07721f1af762df84d61c7df8c4348149f35a8b76ea5dc6f93cb9a2f86b",
+      "pages": 6,
+      "redistributable": false,
+      "license": "IJRTE, all rights reserved; present in this repo as a development sample",
+      "why": "two columns with repeating journal furniture; short enough that a percentage trim is catastrophic"
+    },
+    {
+      "id": "arxiv-attention",
+      "category": "single-column",
+      "source": { "kind": "url", "url": "https://arxiv.org/pdf/1706.03762" },
+      "sha256": "bdfaa68d8984f0dc02beaca527b76f207d99b666d31d1da728ee0728182df697",
+      "pages": 15,
+      "redistributable": true,
+      "license": "arXiv (see the paper's own license)",
+      "why": "dense single-column body with many figures and equations"
+    },
+    {
+      "id": "arxiv-bert",
+      "category": "single-column",
+      "source": { "kind": "url", "url": "https://arxiv.org/pdf/1810.04805" },
+      "sha256": "5692a5514787a8c6727b4ff3b726a3385798bc68e12138d1d4af83947e2acf6e",
+      "pages": 16,
+      "redistributable": true,
+      "license": "arXiv (see the paper's own license)",
+      "why": "long appendix and a references section that must truncate cleanly"
+    },
+    {
+      "id": "arxiv-resnet",
+      "category": "single-column",
+      "source": { "kind": "url", "url": "https://arxiv.org/pdf/1512.03385" },
+      "sha256": "1e0651b6810ecba34a3dbc5b5b0209226f889004607c1f203540a48d64e5a93a",
+      "pages": 12,
+      "redistributable": true,
+      "license": "arXiv (see the paper's own license)",
+      "why": "table-heavy results section: the category where extractors diverge most"
+    },
+    {
+      "id": "arxiv-gpt3",
+      "category": "single-column",
+      "source": { "kind": "url", "url": "https://arxiv.org/pdf/2005.14165" },
+      "sha256": "97fd272f1fdfc18677462d0292f5fbf26ca86b4d1b485c2dba03269b643a0e83",
+      "pages": 75,
+      "redistributable": true,
+      "license": "arXiv (see the paper's own license)",
+      "why": "75 pages: the runtime and memory case, not just the quality case"
+    }
+  ]
+}

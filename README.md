@@ -173,6 +173,9 @@ quantagen/                  # the installable package
 ├── config.json              # packaged default rules (kept identical to the root copy by a test)
 └── __main__.py              # `python -m quantagen`
 app.py                       # Streamlit UI (same extraction + pipeline)
+bench/                       # open benchmark: corpus manifest, fetch/verify, 5 extractor adapters
+bench/corpus.json            # documents by URL + sha256 (never bundled), category targets
+bench/README.md              # pre-registered rubric and the rules for adding a document
 eval/retention.py            # retention audit: numbers/entities/references/answer spans + stage blame
 eval/retrieval.py            # retrieval fidelity: BM25 hit@k / MRR, raw vs post-layout vs cleaned
 eval/compare.py              # head-to-head against other extractors (manual, not in CI)

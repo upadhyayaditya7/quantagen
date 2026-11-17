@@ -20,3 +20,6 @@ Thumbs.db
 
 # Quantagen Outputs
 outputs/
+
+# Benchmark corpus downloads (referenced by URL + sha256 in bench/corpus.json)
+bench/cache/
