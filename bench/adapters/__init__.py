@@ -33,17 +33,25 @@ class Adapter:
         return all(importlib.util.find_spec(module) is not None for module in self.requires)
 
     def version(self) -> str:
-        """Best-effort build string, so a score can be tied to a version."""
+        """Every build string that can move a score, not just the first one.
+
+        Returning only the first import's version labelled every entrant
+        "fitz 1.27.2.3" -- including this project -- so a row could not be tied
+        to the tool that produced it. The extractor, the PDF engine and the
+        tokenizer are all named because any of them changing moves a number.
+        """
+        found = []
         for module in self.requires:
             try:
-                found = importlib.import_module(module)
+                imported = importlib.import_module(module)
             except ImportError:
                 continue
             for attribute in ("__version__", "version"):
-                value = getattr(found, attribute, None)
+                value = getattr(imported, attribute, None)
                 if isinstance(value, str):
-                    return f"{module} {value}"
-        return "version unknown"
+                    found.append(f"{module} {value}")
+                    break
+        return ", ".join(found) if found else "version unknown"
 
     def extract(self, path: str) -> str:
         if not self.available():
@@ -54,7 +62,8 @@ class Adapter:
 ADAPTERS = {
     adapter.name: adapter
     for adapter in (
-        Adapter("quantagen", "bench.adapters.quantagen", ("fitz", "tiktoken"), "pip install -e ."),
+        Adapter("quantagen", "bench.adapters.quantagen",
+                ("quantagen", "fitz", "tiktoken"), "pip install -e ."),
         Adapter("raw", "bench.adapters.raw_pymupdf", ("fitz",), "pip install -e ."),
         Adapter("pymupdf4llm", "bench.adapters.pymupdf4llm", ("pymupdf4llm",), "pip install pymupdf4llm"),
         Adapter("markitdown", "bench.adapters.markitdown", ("markitdown",), "pip install markitdown"),
