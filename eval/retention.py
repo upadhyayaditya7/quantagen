@@ -232,28 +232,75 @@ def _retention_report(base_items, stage_items: list, measure) -> dict:
 
 # --------------------------------------------------------------- answer spans
 
-def _normalize_text(text: str) -> str:
-    return re.sub(r"[^a-z0-9 ]+", " ", text.casefold())
+# Scripts written without spaces are the reason this is not `[a-z0-9]`. An
+# ASCII-only tokeniser does not merely lower a non-Latin score: it deletes every
+# character of a Japanese or Chinese quote, so five of the benchmark's non-Latin
+# spans scored exactly 0.0 for every extractor, including the raw text they were
+# curated from. A metric that cannot see a language is not a conservative metric.
+_CJK_RANGES = "\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff\uf900-\ufaff\uff66-\uff9f"
+_CJK_CHAR = re.compile(f"[{_CJK_RANGES}]")
+_TOKEN_RUN = re.compile(
+    rf"\d+(?:\.\d+)?|[{_CJK_RANGES}]+|[^\W_{_CJK_RANGES}\d]+", re.UNICODE)
+
+
+def script_tokens(text: str) -> list:
+    """Words for spaced scripts, one token per character for CJK.
+
+    Chinese and Japanese carry no word delimiters, so whitespace splitting
+    yields one token for a whole sentence and shingle overlap becomes
+    all-or-nothing. Per-character tokens give the metric a usable resolution
+    there; a real word segmenter would be better and is not available offline.
+    """
+    tokens = []
+    for run in _TOKEN_RUN.finditer(text.casefold()):
+        chunk = run.group(0)
+        if _CJK_CHAR.match(chunk[0]):
+            tokens.extend(chunk)
+            continue
+        tokens.append(chunk)
+    return tokens
+
+
+def _width(text: str) -> int:
+    """Shingle width a passage can support: five tokens, or its own length."""
+    return min(SHINGLE_SIZE, len(script_tokens(text)))
 
 
 def _shingles(text: str, size: int = SHINGLE_SIZE) -> set:
-    words = _normalize_text(text).split()
-    if len(words) < size:
-        return {" ".join(words)} if words else set()
-    return {" ".join(words[i:i + size]) for i in range(len(words) - size + 1)}
+    """Overlapping token windows, shrunk to fit texts shorter than `size`.
+
+    A quote under five tokens cannot produce a five-token window, and the
+    previous version compared its single unpadded token against five-token
+    windows in the document. A legitimate three-word span ("2-layer Neural
+    Net") therefore scored 0.0 against byte-identical text, whatever any
+    extractor did -- a failure of the metric, not of the text.
+    """
+    tokens = script_tokens(text)
+    if not tokens:
+        return set()
+    width = max(1, min(size, len(tokens)))
+    return {" ".join(tokens[i:i + width]) for i in range(len(tokens) - width + 1)}
+
+
+def _overlap(context: str, haystack: set, width: int) -> float:
+    wanted = _shingles(context, width)
+    if not wanted:
+        return 1.0
+    return round(len(wanted & haystack) / len(wanted), 3)
 
 
 def context_coverage(context: str, text: str) -> float:
-    """Share of `context`'s 5-word shingles that still appear in `text`.
+    """Share of `context`'s shingles that still appear in `text`.
 
-    Word-shingle overlap rather than substring matching, so reflowed line
+    Token-shingle overlap rather than substring matching, so reflowed line
     breaks and changed punctuation do not count as lost content while a
-    genuinely deleted sentence scores near zero.
+    genuinely deleted sentence scores near zero. Both sides are measured at the
+    same window width, which is the quote's own length when it is short.
     """
-    wanted = _shingles(context)
-    if not wanted:
+    width = _width(context)
+    if not width:
         return 1.0
-    return round(len(wanted & _shingles(text)) / len(wanted), 3)
+    return _overlap(context, _shingles(text, width), width)
 
 
 _NUMERIC_ANSWER_RE = re.compile(r"^[\d.,]+$")
@@ -272,7 +319,29 @@ def _answer_present(answer: str, final: str, final_numbers: Counter) -> bool:
         return False
     if _NUMERIC_ANSWER_RE.match(value):
         return bool(final_numbers.get(_normalize_number(value)))
+    if _CJK_CHAR.search(value):
+        # Word boundaries are useless inside CJK prose: the neighbouring
+        # characters are word characters too, so a boundary-anchored search
+        # can never match a substring of a CJK sentence.
+        return value.casefold() in final.casefold()
     return re.search(r"(?<!\w)" + re.escape(value) + r"(?!\w)", final) is not None
+
+
+def span_survives(context: str, text: str, answer: str = "",
+                  final_numbers: Counter | None = None) -> bool:
+    """One curated passage: enough context kept, and its answer still present.
+
+    The same rule `answer_span_recall` applies, exposed per span so a caller
+    that knows the span ids can report *which* passage was lost. A `verbatim`
+    span passes no answer and is judged on context alone.
+    """
+    if context_coverage(context, text) < CONTEXT_SHINGLE_FLOOR:
+        return False
+    if not str(answer or "").strip():
+        return True
+    return _answer_present(str(answer), text,
+                           final_numbers if final_numbers is not None
+                           else numbers_in(text))
 
 
 def answer_span_recall(base: str, final: str, items: list) -> dict:
@@ -283,15 +352,22 @@ def answer_span_recall(base: str, final: str, items: list) -> dict:
     ``CONTEXT_SHINGLE_FLOOR`` of the sentence's 5-word shingles survive, so a
     lucky bare number in an unrelated line cannot pass as a retained answer.
     """
-    final_shingles = _shingles(final)
     final_numbers = numbers_in(final)
+    # One shingle set per window width actually needed. Rebuilding the document
+    # for every item is what made short quotes fail before; keeping one set per
+    # width keeps the audit linear in the document and correct for both.
+    haystacks = {}
+    for item in items:
+        width = _width(item.get("context", ""))
+        if width:
+            haystacks.setdefault(width, _shingles(final, width))
     results = []
 
     for item in items:
         context = item.get("context", "")
         answer = str(item.get("answer", ""))
-        wanted = _shingles(context)
-        coverage = (len(wanted & final_shingles) / len(wanted)) if wanted else 1.0
+        width = _width(context)
+        coverage = _overlap(context, haystacks[width], width) if width else 1.0
         present = _answer_present(answer, final, final_numbers)
         results.append({
             "question": item.get("question", ""),

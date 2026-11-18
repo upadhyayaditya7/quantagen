@@ -29,7 +29,6 @@ import glob
 import json
 import math
 import os
-import re
 import sys
 from collections import Counter
 from datetime import datetime, timezone
@@ -45,6 +44,7 @@ from eval.retention import (  # noqa: E402
     CONTEXT_SHINGLE_FLOOR,
     context_coverage,
     extractor_version,
+    script_tokens,
     stage_texts,
 )
 from quantagen.rules import layout  # noqa: E402
@@ -73,12 +73,15 @@ FLOOR_HIT_AT_3 = 80.0  # percent, cleaned text
 # noise: below that, no question lost its answer. Anything beyond it is real.
 MRR_TOLERANCE = 0.05
 
-_TOKEN_RE = re.compile(r"[a-z]+|\d+(?:\.\d+)?")
-
-
 def tokenize(text: str) -> list[str]:
-    """Lowercase words and numbers. No stemming: see the module docstring."""
-    return _TOKEN_RE.findall(text.casefold())
+    """Words and numbers, one token per character for CJK.
+
+    Deliberately the same tokeniser the shingle scorer uses: the two were
+    separate ASCII-only regexes, so a Japanese question indexed almost nothing
+    here and scored zero there, and both bugs read as "the extractor failed".
+    No stemming: see the module docstring.
+    """
+    return script_tokens(text)
 
 
 def chunks(text: str, size: int = CHUNK_WORDS, overlap: int = CHUNK_OVERLAP,
