@@ -57,6 +57,8 @@ if _ROOT not in sys.path:
 
 import fitz  # noqa: E402  (after the sys.path bootstrap)
 
+from bench.rubric import RUBRIC  # noqa: E402
+
 
 def extractor_version() -> str:
     """Which PDF engine produced these numbers.
@@ -91,10 +93,11 @@ STAGE_CHAIN = (
 # denominator of the retention percentage.
 SCOPE_STAGES = frozenset({"structural trim", "stop-marker truncation"})
 
-# Minimum share of an answer-bearing sentence's 5-word shingles that must
-# survive for the sentence to count as retained.
-CONTEXT_SHINGLE_FLOOR = 0.6
-SHINGLE_SIZE = 5
+# Minimum share of an answer-bearing sentence's shingles that must survive for
+# the sentence to count as retained, and the shingle width. Both are read from
+# bench/rubric.json so the audit and the scorer cannot disagree about it.
+CONTEXT_SHINGLE_FLOOR = RUBRIC["retention"]["context_shingle_floor"]
+SHINGLE_SIZE = RUBRIC["retention"]["shingle_size"]
 
 # CI floors (see --check). Losing a measurement is the failure mode this
 # project is most exposed to, so numbers are gated tightly. The book sits at
@@ -102,9 +105,9 @@ SHINGLE_SIZE = 5
 # labels ("1 1 1" / "2 3 4 5" inside a figure), which no regex can tell apart
 # from a page number; that residual is documented in the README. Entities and
 # references must be effectively perfect.
-FLOOR_NUMBER_RETENTION = 97.0
-FLOOR_ENTITY_RETENTION = 99.5
-FLOOR_REFERENCE_RETENTION = 99.5
+FLOOR_NUMBER_RETENTION = RUBRIC["floors"]["number_retention"]
+FLOOR_ENTITY_RETENTION = RUBRIC["floors"]["entity_retention"]
+FLOOR_REFERENCE_RETENTION = RUBRIC["floors"]["reference_retention"]
 
 # 12, 3.5, 1,234.56, 2019 -- commas stripped so "1,234" and "1234" match.
 _NUMBER_RE = re.compile(r"(?<![\w.])\d[\d,]*(?:\.\d+)?(?![\w])")

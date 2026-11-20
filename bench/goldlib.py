@@ -34,17 +34,20 @@ _ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if _ROOT not in sys.path:
     sys.path.insert(0, _ROOT)
 
-from bench import fetch  # noqa: E402  (after the sys.path insert above)
+from bench import fetch, rubric  # noqa: E402  (after the sys.path insert above)
 
 BENCH = os.path.dirname(os.path.abspath(__file__))
 GOLD_DIR = os.path.join(BENCH, "gold")
 SCHEMA_VERSION = 1
-SPANS_PER_DOCUMENT = (8, 10)
+# The bounds live in bench/rubric.json: the validator and the scorer must not
+# disagree about what counts as evidence, and a number typed into two files
+# eventually disagrees.
+SPANS_PER_DOCUMENT = tuple(rubric.RUBRIC["gold"]["spans_per_document"])
 # A character floor is Latin-centric: a CJK quote carries several words per
 # character, so the same information arrives in far fewer of them. Both numbers
 # were picked so that "4.5" fails and a real sentence passes in either script.
-MIN_QUOTE = 20
-MIN_CJK = 10
+MIN_QUOTE = rubric.RUBRIC["gold"]["min_quote"]
+MIN_CJK = rubric.RUBRIC["gold"]["min_cjk"]
 _CJK = re.compile(r"[\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff\uff66-\uff9f]")
 
 

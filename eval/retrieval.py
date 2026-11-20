@@ -40,6 +40,7 @@ if _ROOT not in sys.path:
 
 import fitz  # noqa: E402  (after the sys.path bootstrap)
 
+from bench.rubric import RUBRIC  # noqa: E402
 from eval.retention import (  # noqa: E402
     CONTEXT_SHINGLE_FLOOR,
     context_coverage,
@@ -49,29 +50,31 @@ from eval.retention import (  # noqa: E402
 )
 from quantagen.rules import layout  # noqa: E402
 
-# Retrieval settings. Deliberately boring RAG defaults: ~120-word chunks with a
-# 30-word overlap, top-5 cut-off. Changing them changes every number below, so
-# they live here as named constants.
-CHUNK_WORDS = 120
-CHUNK_OVERLAP = 30
-TOP_K = 5
+# Retrieval settings, read from bench/rubric.json. Deliberately boring RAG
+# defaults: ~120-word chunks with a 30-word overlap, top-5 cut-off. Changing
+# them changes every number measured anywhere, so they are data rather than
+# literals typed into this module.
+CHUNK_WORDS = RUBRIC["retrieval"]["chunk_words"]
+CHUNK_OVERLAP = RUBRIC["retrieval"]["chunk_overlap"]
+TOP_K = RUBRIC["retrieval"]["top_k"]
 # A single window alignment makes the score a coin flip: on the bundled book the
 # same answer sentence ranks 3rd or 6th depending only on whether the 120-word
 # window starts 0 or 20 words earlier, with the sentence itself bit-identical.
-# Every variant is therefore scored at three staggered alignments and averaged,
-# so a pipeline change is judged on the text rather than on chunk luck.
-CHUNK_OFFSETS = (0, 40, 80)
+# Every variant is therefore scored at several staggered alignments and
+# averaged, so a pipeline change is judged on the text rather than on chunk
+# luck. The offsets are the rubric's `window_offsets`.
+CHUNK_OFFSETS = tuple(RUBRIC["retrieval"]["window_offsets"])
 
 # CI floors (see --check). Cleaning is only allowed to help retrieval: it
 # removes furniture that wastes index space, so a regression here means the
 # output became harder to search.
-FLOOR_HIT_AT_3 = 80.0  # percent, cleaned text
+FLOOR_HIT_AT_3 = RUBRIC["floors"]["hit_at_3"]  # percent, cleaned text
 # On a 10-question set one question slipping a single rank moves MRR by 0.05,
 # so a 0.01 tolerance was stricter than the metric's own granularity -- it held
 # only until a change shifted one window boundary. The gate therefore asserts
 # findability (clean hit@3 may not fall below raw's) and treats 0.05 of MRR as
 # noise: below that, no question lost its answer. Anything beyond it is real.
-MRR_TOLERANCE = 0.05
+MRR_TOLERANCE = RUBRIC["floors"]["mrr_tolerance"]
 
 def tokenize(text: str) -> list[str]:
     """Words and numbers, one token per character for CJK.

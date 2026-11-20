@@ -21,7 +21,14 @@ from .rules.parser import (
     strip_recurring_noise, truncate_at_stop_markers, extract_sections, load_config
 )
 from .rules import layout
-def get_token_count(text: str, model: str = "gpt-4o") -> int:
+
+# The tokenizer every published token count is measured with. It is recorded in
+# bench/rubric.json as well; tests/test_rubric.py keeps the two in step, because
+# a report counted with a different model is not comparable to the last one.
+DEFAULT_TOKEN_MODEL = "gpt-4o"
+
+
+def get_token_count(text: str, model: str = DEFAULT_TOKEN_MODEL) -> int:
     encoder = tiktoken.encoding_for_model(model)
     return len(encoder.encode(text))
 

@@ -25,7 +25,7 @@ import time
 
 import fitz
 
-from bench import fetch, goldlib
+from bench import fetch, goldlib, rubric
 from bench.adapters import ADAPTERS, ExtractionUnavailable
 from eval.retention import (
     entities_in,
@@ -36,9 +36,16 @@ from eval.retention import (
 from eval.retrieval import evaluate
 from quantagen.pipeline import get_token_count
 
-# The order RESULTS.md shows. Every adapter is scored with the same interface;
-# an unavailable one is reported as unavailable, never skipped silently.
-ADAPTER_ORDER = ("quantagen", "raw", "pymupdf4llm", "markitdown", "docling")
+# The order RESULTS.md shows, derived from the registry instead of repeated:
+# a new adapter appears in the table with no second list to remember. Every
+# adapter is scored with the same interface; an unavailable one is reported as
+# unavailable, never skipped silently.
+ADAPTER_ORDER = tuple(ADAPTERS)
+
+
+def _tokens(text: str) -> int:
+    """Count tokens with the model the rubric names, not one typed here."""
+    return get_token_count(text, rubric.RUBRIC["tokenizer"]["model"])
 
 
 class ResultsUnavailable(RuntimeError):
@@ -102,7 +109,7 @@ def score(reference: str, text: str, gold: dict, seconds: float = 0.0) -> dict:
     base_entities, base_refs = entities_in(reference), references_in(reference)
     kept_numbers = output_numbers & base_numbers
 
-    tokens, reference_tokens = get_token_count(text), get_token_count(reference)
+    tokens, reference_tokens = _tokens(text), _tokens(reference)
     record = {
         "status": "ok",
         "seconds": round(seconds, 2),
@@ -181,7 +188,7 @@ def run_document(entry: dict, adapters=ADAPTER_ORDER, gold=None) -> dict:
         "id": entry["id"],
         "category": entry["category"],
         "pages": entry.get("pages"),
-        "reference": {"tokens": get_token_count(reference), "chars": len(reference)},
+        "reference": {"tokens": _tokens(reference), "chars": len(reference)},
         "gold": {
             "readable": bool((gold or {}).get("readable", False)),
             "spans": goldlib.span_count(gold or {}),
@@ -229,4 +236,10 @@ def run(corpus: dict = None, adapters=ADAPTER_ORDER, categories=None,
         if progress is not None:
             progress(entry)
         scored.append(run_document(entry, adapters))
-    return {"categories": coverage, "documents": scored}
+    return {
+        "categories": coverage,
+        "documents": scored,
+        # Echoed into the run so the report describes the settings that produced
+        # it, even if bench/rubric.json is edited before the report is rendered.
+        "rubric": rubric.snapshot(),
+    }
