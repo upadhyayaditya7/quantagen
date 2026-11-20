@@ -53,6 +53,29 @@ jobs:
           set -o pipefail
           python eval/retrieval.py --check 2>&1 | tee retrieval-run.log
 
+      # The benchmark's inputs and gold are data, and data rots quietly: a
+      # manifest with a stale hash or a gold quote that no longer appears on the
+      # page it names would otherwise only be found by a run that happens to
+      # look at that document. Both checks are offline; the corpus itself is not
+      # downloaded here, so gold is validated for structure only.
+      - name: Benchmark data checks
+        run: |
+          set -o pipefail
+          python bench/fetch.py --check 2>&1 | tee bench-fetch.log
+
+      - name: Benchmark gold checks
+        run: |
+          set -o pipefail
+          python bench/goldlib.py --check --no-documents 2>&1 | tee bench-gold.log
+
+      # Every parameter behind a published number is read from bench/rubric.json
+      # and tests/test_rubric.py proves the code reads it; this proves the file
+      # on this commit still validates on its own.
+      - name: Rubric checks
+        run: |
+          set -o pipefail
+          python -c "from bench import rubric; print('rubric OK', rubric.RUBRIC['retrieval'])" 2>&1 | tee bench-rubric.log
+
       # Preserve the tee'd exit status with pipefail; publish the full
       # pytest output to the (publicly readable) job summary when the run
       # fails, so the failing traceback can be diagnosed without accessing
@@ -61,7 +84,8 @@ jobs:
         if: failure()
         run: |
           {
-            for log in pytest-run.log retention-run.log retrieval-run.log; do
+            for log in pytest-run.log retention-run.log retrieval-run.log \
+                       bench-fetch.log bench-gold.log bench-rubric.log; do
               [ -f "$log" ] || continue
               echo "## $log (Python ${PYTHON_VERSION:-unknown})"
               echo '```'
