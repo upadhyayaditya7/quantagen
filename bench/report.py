@@ -24,7 +24,7 @@ _ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if _ROOT not in sys.path:
     sys.path.insert(0, _ROOT)
 
-from bench import fetch, goldlib, metrics  # noqa: E402
+from bench import fetch, goldlib, metrics, rubric  # noqa: E402
 from bench.adapters import ADAPTERS  # noqa: E402
 
 BENCH = os.path.dirname(os.path.abspath(__file__))
@@ -37,6 +37,35 @@ def _num(value, kind: str) -> str:
     if value is None:
         return "—"
     return f"{value:.{WIDTHS[kind]}f}"
+
+
+_COUNT_WORDS = ("zero", "one", "two", "three", "four", "five", "six",
+                "seven", "eight", "nine", "ten")
+
+
+def _count_word(number: int) -> str:
+    return _COUNT_WORDS[number] if 0 <= number < len(_COUNT_WORDS) else str(number)
+
+
+def rubric_prose(data: dict) -> str:
+    """The method paragraph, assembled from the rubric that produced the run.
+
+    Typed prose was the leak: it named a chunk size and a tokenizer that no one
+    checked against the code, so the published method could describe a build
+    this repository no longer contains.
+    """
+    tokenizer, retrieval = data["tokenizer"], data["retrieval"]
+    retention = data["retention"]
+    alignments = _count_word(len(retrieval["window_offsets"]))
+    return (
+        f"Token counts use `{tokenizer['library']}` ({tokenizer['model']}). "
+        f"Retrieval is {retrieval['engine']} over {retrieval['chunk_words']}-word "
+        f"chunks with {retrieval['chunk_overlap']}-word overlap, averaged over "
+        f"{alignments} window alignments. Retention is measured against the "
+        f"{retention['reference']} of the same document, so a tool that "
+        "deliberately drops page furniture or references scores lower on numbers "
+        "and entities — that cost is shown here rather than excused."
+    )
 
 
 def _mean(values):
@@ -239,12 +268,7 @@ def render(results: dict, stamp: str = None, timings: bool = False) -> str:
         "hash-verified files in `bench/cache/`. Nothing in this file is edited "
         "by hand; a number that cannot be regenerated is not quoted.",
         "",
-        "Token counts use `tiktoken` (gpt-4o). Retrieval is BM25 over "
-        "120-word chunks with 30-word overlap, averaged over three window "
-        "alignments. Retention is measured against the raw PyMuPDF text of the "
-        "same document, so a tool that deliberately drops page furniture or "
-        "references scores lower on numbers and entities — that cost is shown "
-        "here rather than excused.",
+        rubric_prose(results.get("rubric") or rubric.RUBRIC),
         "",
         "Wall clock is measured but excluded from this file: a timing that "
         "changes between two runs of the same code would make every row "
@@ -270,7 +294,7 @@ def main(argv=None) -> int:
         description="Score the benchmark corpus and render bench/RESULTS.md.")
     parser.add_argument("--categories", nargs="*", default=None,
                         help="categories to score (default: those at target)")
-    parser.add_argument("--adapters", nargs="*", default=list(metrics.ADAPTER_ORDER),
+    parser.add_argument("--adapters", nargs="*", default=list(ADAPTERS),
                         help="extractors to run (default: all known)")
     parser.add_argument("--out", default=DEFAULT_OUT)
     parser.add_argument("--stamp", action="store_true",
