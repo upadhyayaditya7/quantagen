@@ -136,6 +136,15 @@ result they affect:
   0.0 for every tool, including the raw text the span was curated from. The retrieval
   tokeniser was ASCII-only for the same reason. Both now share one script-aware
   tokeniser.
+- **2026-11-20 — the rubric is a file, not prose.** Every parameter in the table
+  above now lives in `bench/rubric.json`: tokenizer model, chunk window, overlap,
+  alignments, top-k, span bounds, quote floors, shingle floor and the CI floors.
+  `bench/report.py` builds its method paragraph from the rubric the run recorded,
+  `bench/metrics.py` counts tokens with the model named there, and
+  `tests/test_rubric.py` fails if any module keeps a second copy of a value. The
+  definitions and the reported results are unchanged; `RESULTS.md` regenerates
+  byte-identically, which is how the refactor is known to have altered nothing it
+  measures. Nothing here may be tuned after seeing a result it affects.
 
 ## corpus.json
 

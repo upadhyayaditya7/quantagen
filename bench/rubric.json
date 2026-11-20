@@ -1,0 +1,31 @@
+{
+  "schema_version": 1,
+  "tokenizer": {
+    "library": "tiktoken",
+    "model": "gpt-4o"
+  },
+  "retrieval": {
+    "engine": "BM25",
+    "chunk_words": 120,
+    "chunk_overlap": 30,
+    "window_offsets": [0, 40, 80],
+    "top_k": 5
+  },
+  "retention": {
+    "reference": "raw PyMuPDF text",
+    "context_shingle_floor": 0.6,
+    "shingle_size": 5
+  },
+  "gold": {
+    "spans_per_document": [8, 10],
+    "min_quote": 20,
+    "min_cjk": 10
+  },
+  "floors": {
+    "number_retention": 97.0,
+    "entity_retention": 99.5,
+    "reference_retention": 99.5,
+    "hit_at_3": 80.0,
+    "mrr_tolerance": 0.05
+  }
+}
