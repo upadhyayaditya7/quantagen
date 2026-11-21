@@ -29,6 +29,8 @@ SCHEMA_VERSION = 1
 # in one place and an unused value in the other.
 REQUIRED = {
     "tokenizer": ("library", "model"),
+    "answers": ("provider", "base_url", "model", "temperature",
+                "max_output_tokens", "seed", "prompt_mode", "accuracy_tolerance"),
     "retrieval": ("engine", "chunk_words", "chunk_overlap", "window_offsets", "top_k"),
     "retention": ("reference", "context_shingle_floor", "shingle_size"),
     "gold": ("spans_per_document", "min_quote", "min_cjk"),
@@ -53,6 +55,13 @@ def _percentage(value, where: str) -> float:
     if (not isinstance(value, (int, float)) or isinstance(value, bool)
             or not 0 <= value <= 100):
         raise RubricError(f"{where} must be a percentage between 0 and 100, got {value!r}")
+    return value
+
+
+def _number(value, where: str, low: float, high: float) -> float:
+    if (not isinstance(value, (int, float)) or isinstance(value, bool)
+            or not low <= value <= high):
+        raise RubricError(f"{where} must be a number between {low} and {high}, got {value!r}")
     return value
 
 
@@ -94,6 +103,21 @@ def validate(data: dict, where: str = "bench/rubric.json") -> dict:
 
     _text(tokenizer["library"], f"{where}: tokenizer.library")
     _text(tokenizer["model"], f"{where}: tokenizer.model")
+
+    answers = data["answers"]
+    _text(answers["provider"], f"{where}: answers.provider")
+    _text(answers["base_url"], f"{where}: answers.base_url")
+    if not str(answers["base_url"]).startswith(("http://", "https://")):
+        raise RubricError(f"{where}: answers.base_url must be an http(s) URL, "
+                          f"got {answers['base_url']!r}")
+    _text(answers["model"], f"{where}: answers.model")
+    _number(answers["temperature"], f"{where}: answers.temperature", 0, 2)
+    _integer(answers["max_output_tokens"], f"{where}: answers.max_output_tokens", 1)
+    _integer(answers["seed"], f"{where}: answers.seed")
+    if answers["prompt_mode"] not in ("rag", "full"):
+        raise RubricError(f"{where}: answers.prompt_mode must be 'rag' or 'full', "
+                          f"got {answers['prompt_mode']!r}")
+    _percentage(answers["accuracy_tolerance"], f"{where}: answers.accuracy_tolerance")
 
     _text(retrieval["engine"], f"{where}: retrieval.engine")
     words = _integer(retrieval["chunk_words"], f"{where}: retrieval.chunk_words", 1)

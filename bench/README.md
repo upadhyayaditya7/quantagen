@@ -146,6 +146,15 @@ result they affect:
   byte-identically, which is how the refactor is known to have altered nothing it
   measures. Nothing here may be tuned after seeing a result it affects.
 
+- **2026-11-21 — a fifth block: `answers`.** The rubric now also holds the
+  parameters of the answer-accuracy measurement (`eval/answers.py`): the model,
+  its temperature, output budget and seed, the prompt shape and the accuracy
+  floor. It is an addition, not a change to an existing metric, and it was added
+  before that harness has produced a single number — nothing above was measured
+  with it, so no published result is affected. Prices are *not* in the rubric:
+  they are provider facts with a date, so they live in `eval/models.json` next to
+  the `prices_checked` value the harness prints.
+
 ## corpus.json
 
 ```jsonc

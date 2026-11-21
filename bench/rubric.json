@@ -4,6 +4,16 @@
     "library": "tiktoken",
     "model": "gpt-4o"
   },
+  "answers": {
+    "provider": "openai",
+    "base_url": "https://api.openai.com/v1",
+    "model": "gpt-4o-mini",
+    "temperature": 0,
+    "max_output_tokens": 64,
+    "seed": 20261121,
+    "prompt_mode": "rag",
+    "accuracy_tolerance": 5.0
+  },
   "retrieval": {
     "engine": "BM25",
     "chunk_words": 120,

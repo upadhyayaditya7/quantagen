@@ -13,7 +13,7 @@ import pytest
 
 from bench import goldlib, metrics, report, rubric
 from bench.adapters import ADAPTERS
-from eval import retention, retrieval
+from eval import answers, retention, retrieval
 from quantagen.pipeline import DEFAULT_TOKEN_MODEL
 
 
@@ -93,6 +93,23 @@ def test_the_tokenizer_is_the_one_the_pipeline_defaults_to():
     # The benchmark and the product must count tokens the same way, or the
     # headline ratio compares two different rulers.
     assert metrics.rubric.RUBRIC["tokenizer"]["model"] == DEFAULT_TOKEN_MODEL
+
+
+def test_answer_settings_are_the_rubric():
+    data = rubric.RUBRIC["answers"]
+    assert answers.DEFAULT_MODEL == data["model"]
+    assert answers.PROMPT_MODE == data["prompt_mode"]
+    assert answers.TEMPERATURE == data["temperature"]
+    assert answers.MAX_OUTPUT_TOKENS == data["max_output_tokens"]
+    assert answers.SEED == data["seed"]
+    assert answers.ACCURACY_TOLERANCE == data["accuracy_tolerance"]
+
+
+def test_an_unknown_prompt_mode_is_rejected():
+    data = _rubric()
+    data["answers"]["prompt_mode"] = "whole"
+    with pytest.raises(rubric.RubricError, match="prompt_mode"):
+        rubric.validate(data)
 
 
 def test_adapter_order_comes_from_the_registry():
