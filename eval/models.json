@@ -1,0 +1,35 @@
+{
+  "_comment": [
+    "USD per 1M tokens, read from the provider's public price page on the date",
+    "in `prices_checked`. They are data because a price change must not silently",
+    "invalidate a published cost claim: the harness prints the price and the",
+    "date it was read next to every figure, and `eval/answers.py --dry-run`",
+    "prices the run before it is paid for.",
+    "Adding a model: copy an entry, give it the provider's current rates and",
+    "context window, and re-run the dry run. A model missing from this file can",
+    "still be measured for accuracy; it just cannot be priced.",
+    "gpt-4o-mini is the default because the report's token counts come from",
+    "tiktoken's gpt-4o encoder, so its input tokens are counted, not estimated."
+  ],
+  "prices_checked": "2026-11-21",
+  "models": {
+    "gpt-4o-mini": {
+      "provider": "openai",
+      "input_per_million_usd": 0.15,
+      "output_per_million_usd": 0.6,
+      "context_window": 128000
+    },
+    "gpt-5-nano": {
+      "provider": "openai",
+      "input_per_million_usd": 0.05,
+      "output_per_million_usd": 0.4,
+      "context_window": 272000
+    },
+    "gpt-4.1-mini": {
+      "provider": "openai",
+      "input_per_million_usd": 0.4,
+      "output_per_million_usd": 1.6,
+      "context_window": 1047576
+    }
+  }
+}

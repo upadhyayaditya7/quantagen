@@ -50,6 +50,7 @@ The `quantagen` CLI (`quantagen/cli.py`) and `app.py` (UI) both call the same `l
 - **Retention audit** (`eval/retention.py`) — the pipeline is lossy, so it proves what it kept: numbers, capitalised entities and figure/table/citation references are extracted before and after cleaning, every loss is attributed to the stage that caused it, and hand-curated answer-bearing passages (18 across the two samples) are checked for survival. Deliberate scope decisions (front/back-matter trim, reference truncation) are reported with their measured cost instead of being silently excused. CI fails the build if retention drops below its floors.
 - **Retrieval-fidelity benchmark** (`eval/retrieval.py`) — survival is not the same as findable, so the same 18 curated questions are BM25-ranked over raw, post-layout and cleaned text (hit@1/3/5, MRR). All 18 curated answers stay in the top 3 in every variant, the paper's MRR improves, and the index shrinks 10.2% and 38.8%; scores are averaged over three window alignments so chunk boundaries cannot decide the result. CI fails if cleaning loses an answer the raw text found.
 - **Head-to-head comparison** (`eval/compare.py`) — another extractor's output is scored on the same questions and metrics. Measured against `pymupdf4llm` 2.1: 34% fewer tokens on the book (17.5% below raw, versus 24.9% *above* raw), one more curated answer retained, and better MRR on both samples — with the unfair parts of that comparison written down rather than omitted.
+- **Answer-accuracy harness** (`eval/answers.py`) — the measurement the other three only imply: the curated questions are put to a chat model over raw and cleaned text, each reply is graded mechanically against the gold answer (the value must appear, so `30,000` cannot pass as `300,000`), and the tokens are priced from a dated table (`eval/models.json`) into dollars per question and per 1,000 documents. Every request is cached by content hash and keeps the provider's `system_fingerprint`, so a rerun is free and identical; a document too large for the context window is skipped with its size instead of being truncated. Manual, because it needs an API key and spends money; CI never runs it.
 - **Installable console script** — `pip install -e .` puts a `quantagen` command on PATH: `quantagen` scans `./inputs`, `quantagen report.pdf papers/ --out build` takes explicit files and directories and writes cleaned text plus the audit trail wherever you point it. The same entry point runs without the script via `python -m quantagen`.
 - **Streamlit UI** (`app.py`) — multi-file upload, one tab per document with raw/cleaned token metrics, a 600px preview pane, per-file `.txt` download, and a batch summary table.
 - **Token accounting with stage breakdown** — raw vs. cleaned token counts via `tiktoken`, the reduction percentage, and *which stage* removed how many tokens. Savings are attributable, not just asserted.
@@ -162,6 +163,26 @@ python eval/compare.py --tool pymupdf4llm                  # needs pymupdf4llm i
 python eval/compare.py --from-file "pymupdf4llm=out/{stem}.md"   # or score text you already have
 ```
 
+## Answer accuracy
+
+Retention and retrieval are proxies: content survived, and a lexical index can still find it. Neither says a model reading the cleaned text produces the same answers as a model reading the raw extraction — which is the entire claim of "LLM-ready text". `eval/answers.py` measures that directly, on the `answer` spans in `bench/gold/`, whose quotes are verified against the page they name.
+
+```bash
+export OPENAI_API_KEY=...            # never stored in the repository
+python eval/answers.py --dry-run    # assemble and price every prompt; send nothing
+python eval/answers.py --mode rag   # answer each question from the top-k chunks
+python eval/answers.py --mode full  # answer each question from the whole document
+python eval/answers.py --check      # exit non-zero if cleaning loses answers
+```
+
+What the numbers mean, precisely:
+
+- **Two prompt modes.** `rag` shows the model the same top-k BM25 chunks a retriever would hand it, on any document size. `full` shows it the whole text; a document whose token count exceeds the model's context window is reported as skipped, never truncated, because a truncated document would be scored as the extractor's fault.
+- **Mechanical grading.** A reply is correct when the gold value appears in it, compared as a value rather than as a substring, and case-insensitively. No model judge: a second model scoring the first would need its own benchmark.
+- **Cost is derived, not asserted.** Per-question cost comes from the provider's reported token usage and the price table; the per-1,000-documents figure scales the measured per-question cost by the mean question count of the documents actually measured. The price and the date it was read are printed with every run.
+- **Reproducible by cache.** Requests are cached by a hash of model, messages, temperature and output budget, so a rerun sends nothing and returns the same result; a provider changing the model underneath a result shows up as a new `system_fingerprint` instead of as a pipeline regression.
+- **A sample, not a certificate.** Three documents carry `answer` spans today (24 questions), and the harness never runs in CI. Read it next to that limitation, not instead of it.
+
 ## Repository layout
 
 ```
@@ -184,6 +205,8 @@ bench/RESULTS.md             # measured: 4 categories, quantagen vs raw, every l
 eval/retention.py            # retention audit: numbers/entities/references/answer spans + stage blame
 eval/retrieval.py            # retrieval fidelity: BM25 hit@k / MRR, raw vs post-layout vs cleaned
 eval/compare.py              # head-to-head against other extractors (manual, not in CI)
+eval/answers.py              # answer accuracy + cost per 1k documents, raw vs cleaned (manual, needs a key)
+eval/models.json             # dated USD-per-1M-token prices the cost column multiplies
 eval/gold.json               # 18 curated answer-bearing passages (quoted from the raw extraction)
 config.json                  # the editable rules file for a checkout
 pyproject.toml               # packaging, console script, pinned dependencies
@@ -288,7 +311,7 @@ All tunables live in [`config.json`](config.json). It resolves as `$QUANTAGEN_CO
 
 ## Known limitations
 
-1. **Retention is a proxy for quality, not a measurement of it.** Numbers, entities, figure references and 18 curated passages are checked for survival; retrieval fidelity (`eval/retrieval.py`) then checks the passages are still findable, but nothing yet measures whether *answers computed* from the cleaned text match answers from the raw text. Treat retention as a floor, not a certificate.
+1. **Retention is still a proxy for quality.** Numbers, entities, figure references and 18 curated passages are checked for survival, and retrieval fidelity (`eval/retrieval.py`) checks the passages are still findable. The missing half — whether *answers computed* from the cleaned text match answers from the raw text — is now measured by `eval/answers.py` against a chat model, but only three documents carry answer spans (24 questions), it needs an API key, and it never runs in CI. Treat retention as a floor and the answer number as a small sample, not a certificate.
 2. **Reading order is a heuristic, not a layout model.** The XY-cut needs a genuinely empty gutter to split columns, and it separates structural rows before columns. Table- or figure-like regions whose whitespace aligns are therefore read row-wise, and a multi-column page with an irregular gutter can fall back to top-to-bottom order. It fixes the common cases (papers, books); it is not a document-AI model.
 3. **Reflow is heuristic.** An end-of-line hyphen is only removed when the next line starts lowercase, so compound words split at a line break stay hyphenated. Paragraph stitching needs a long previous line and a lowercase continuation, so some page breaks remain visible (39 in the bundled book).
 4. **Front-matter detection needs an anchor.** A table of contents (three or more dot-leader lines) or a title block followed by a real paragraph is what licenses a cut; a cover page with no TOC and no prose behind it, an epigraph, or a document that begins with a figure keeps its front matter. That is deliberate — the alternative was a percentage, which was measured removing the start of the paper's abstract — but it means detection is a floor, not a guarantee.

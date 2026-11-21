@@ -330,6 +330,19 @@ def _answer_present(answer: str, final: str, final_numbers: Counter) -> bool:
     return re.search(r"(?<!\w)" + re.escape(value) + r"(?!\w)", final) is not None
 
 
+def answer_in(answer: str, text: str, text_numbers: Counter | None = None) -> bool:
+    """Public form of the value check, for anything grading a reply.
+
+    `span_survives` asks whether the document still holds the answer; the
+    answer-accuracy harness (`eval/answers.py`) asks whether a model's *reply*
+    holds it. Both should mean the same thing by "the answer is there", so both
+    call this one function instead of each writing its own substring test.
+    """
+    return _answer_present(answer, text,
+                           text_numbers if text_numbers is not None
+                           else numbers_in(text))
+
+
 def span_survives(context: str, text: str, answer: str = "",
                   final_numbers: Counter | None = None) -> bool:
     """One curated passage: enough context kept, and its answer still present.
@@ -342,9 +355,7 @@ def span_survives(context: str, text: str, answer: str = "",
         return False
     if not str(answer or "").strip():
         return True
-    return _answer_present(str(answer), text,
-                           final_numbers if final_numbers is not None
-                           else numbers_in(text))
+    return answer_in(str(answer), text, final_numbers)
 
 
 def answer_span_recall(base: str, final: str, items: list) -> dict:
